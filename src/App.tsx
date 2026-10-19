@@ -201,10 +201,14 @@ function MainApp() {
   );
 }
 
+import { GmailProvider } from './context/GmailContext';
+
 export default function App() {
   return (
-    <VotingStoreProvider>
-      <MainApp />
-    </VotingStoreProvider>
+    <GmailProvider>
+      <VotingStoreProvider>
+        <MainApp />
+      </VotingStoreProvider>
+    </GmailProvider>
   );
 }

@@ -25,16 +25,23 @@ import {
   Clock,
   Layers,
   Sparkles,
-  Key
+  Key,
+  Mail,
+  Send,
+  Database
 } from 'lucide-react';
+import { useGmail } from '../context/GmailContext';
+import { GmailBroadcastPanel } from './GmailBroadcastPanel';
+import { isSupabaseConfigured } from '../lib/supabaseClient';
 
 interface CommissionerDashboardViewProps {
   onNavigate: (view: ViewId) => void;
 }
 
-type TabType = 'overview' | 'results-control' | 'controls' | 'voter-roll' | 'candidates' | 'ballot-ledger';
+type TabType = 'overview' | 'results-control' | 'controls' | 'voter-roll' | 'candidates' | 'ballot-ledger' | 'gmail-broadcast';
 
 export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardViewProps) {
+  const { isGmailConnected } = useGmail();
   const {
     votes,
     totalRegistered,
@@ -427,6 +434,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
               { id: 'voter-roll', label: 'Voter Roll & Registry', icon: Users },
               { id: 'candidates', label: 'Candidate Clearance', icon: ShieldCheck },
               { id: 'ballot-ledger', label: 'Cast Ballots Ledger', icon: FileText, badge: `${totalVotesCast}` },
+              { id: 'gmail-broadcast', label: 'Gmail Dispatcher', icon: Mail, badge: isGmailConnected ? 'GMAIL ACTIVE' : undefined },
             ].map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -466,6 +474,26 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
               );
             })}
           </nav>
+        </div>
+
+        {/* Supabase Storage Status Chip */}
+        <div className="px-4 py-2.5 border-t border-border bg-card/60 flex items-center justify-between text-[11px]">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Database className="h-3.5 w-3.5" />
+            <span className="font-medium">Supabase DB</span>
+          </div>
+          {isSupabaseConfigured() ? (
+            <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-500/15 px-2 py-0.5 rounded">
+              CONNECTED
+            </span>
+          ) : (
+            <span
+              className="font-mono text-[10px] font-bold text-amber-800 bg-amber-500/15 px-2 py-0.5 rounded cursor-help"
+              title="Awaiting Supabase secrets in environment: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY"
+            >
+              PENDING SECRETS
+            </span>
+          )}
         </div>
 
         {/* Sidebar Footer */}
@@ -753,6 +781,14 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-5 py-2.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors cursor-pointer"
                 >
                   <span>Switch to {isResultsLive ? 'Embargo Mode (5pm Timer)' : 'Live Mode'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('gmail-broadcast')}
+                  className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-5 py-2.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  <span>Broadcast Certified Results via Gmail</span>
                 </button>
               </div>
             </div>
@@ -1217,6 +1253,13 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                 Displaying most recent 30 of {totalVotesCast} constitutionally sealed ballots.
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAB 7: GMAIL DISPATCHER & RESULTS BROADCAST */}
+        {activeTab === 'gmail-broadcast' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <GmailBroadcastPanel />
           </div>
         )}
       </main>
