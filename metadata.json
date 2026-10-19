@@ -1,0 +1,6 @@
+{
+  "name": "KUPSA Elections Portal",
+  "description": "Official election information, candidate directory, student eligibility preview, and Electoral Commission readiness workspace for the Kabarak University Pharmacy Students Association.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
