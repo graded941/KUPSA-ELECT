@@ -743,7 +743,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
                 onClick={() => onNavigate('portal')}
                 className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-1.5 text-xs font-semibold text-ink-foreground shadow-xs hover:bg-primary transition-colors"
               >
-                <span>{currentPhase === 'polling-live' ? 'Open Voting Booth' : 'Check Voter Roll Clearance'}</span>
+                <span>Proceed to Vote</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </button>
               <button

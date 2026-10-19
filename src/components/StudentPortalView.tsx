@@ -105,7 +105,7 @@ export function StudentPortalView({ onNavigate }: StudentPortalViewProps) {
 
   return (
     <>
-      <PageIntro eyebrow="Student portal" title="Check if you can vote">
+      <PageIntro eyebrow="Vote" title="Check if you can vote">
         Enter your pharmacy student registration number. Instant constitutional verification against the certified Dean's roll.
       </PageIntro>
 

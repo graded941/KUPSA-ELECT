@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { ViewId, ElectionPhase } from './types';
+import { VotingStoreProvider, useVotingStore } from './context/VotingStore';
 import { Navbar } from './components/Navbar';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { OverviewView } from './components/OverviewView';
 import { CandidatesView } from './components/CandidatesView';
-import { StudentPortalView } from './components/StudentPortalView';
+import { AuthView } from './components/AuthView';
+import { BallotView } from './components/BallotView';
+import { CommissionerDashboardView } from './components/CommissionerDashboardView';
 import { ResultsView } from './components/ResultsView';
 import { CommissionWorkspaceView } from './components/CommissionWorkspaceView';
 import { RolesView } from './components/RolesView';
@@ -21,9 +24,19 @@ function getViewFromHash(): ViewId {
   switch (hash) {
     case 'candidates':
       return 'candidates';
+    case 'auth':
+    case 'login':
+    case 'signup':
+      return 'auth';
     case 'portal':
     case 'student-portal':
+    case 'vote':
+    case 'ballot':
       return 'portal';
+    case 'commissioner':
+    case 'dashboard':
+    case 'tally':
+      return 'commissioner';
     case 'roles':
       return 'roles';
     case 'rules':
@@ -39,7 +52,7 @@ function getViewFromHash(): ViewId {
     case 'commission':
     case 'commission-workspace':
     case 'governance':
-      return 'commission';
+      return 'commissioner'; // Route to the data-dense Commissioner dashboard
     case 'overview':
     case '':
     default:
@@ -47,7 +60,7 @@ function getViewFromHash(): ViewId {
   }
 }
 
-export default function App() {
+function MainApp() {
   const [currentView, setCurrentView] = useState<ViewId>(getViewFromHash);
   const [currentPhase, setCurrentPhase] = useState<ElectionPhase>('pre-election');
 
@@ -66,8 +79,10 @@ export default function App() {
 
   const handleNavigate = (view: ViewId) => {
     let cleanView: ViewId = view;
-    if (view === 'student-portal') cleanView = 'portal';
-    if (view === 'commission-workspace' || view === 'governance') cleanView = 'commission';
+    if (view === 'student-portal' || view === 'ballot') cleanView = 'portal';
+    if (view === 'commission-workspace' || view === 'governance' || view === 'commission') {
+      cleanView = 'commissioner';
+    }
     if (view === 'how-it-works') cleanView = 'rules';
     if (view === 'code-of-conduct') cleanView = 'conduct';
 
@@ -76,18 +91,33 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const { currentUser, announcementBanner, electionPhase } = useVotingStore();
+
+  // Dedicated focus mode for voting or commissioner portal (both have their own focused layout & sidebar)
+  const isCustomLayout = (currentView === 'portal' && Boolean(currentUser)) || currentView === 'commissioner';
+
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground font-sans selection:bg-accent selection:text-ink antialiased">
-      {/* Main Sticky Navbar */}
-      <Navbar
-        currentView={currentView}
-        onNavigate={handleNavigate}
-        currentPhase={currentPhase}
-        onPhaseChange={setCurrentPhase}
-      />
+      {/* Commission Broadcast Notice Banner (When configured) */}
+      {announcementBanner && !isCustomLayout && (
+        <div className="bg-ink text-sun px-4 py-2 text-xs font-mono text-center border-b border-white/10 flex items-center justify-center gap-2">
+          <span className="font-bold uppercase tracking-wider text-primary">Commission Notice:</span>
+          <span>{announcementBanner}</span>
+        </div>
+      )}
 
-      {/* Main View Container with mobile-first bottom padding for MobileBottomNav */}
-      <main className="flex-1 pb-24 lg:pb-12">
+      {/* Main Sticky Navbar (Hidden during active ballot voting and commissioner sidebar mode) */}
+      {!isCustomLayout && (
+        <Navbar
+          currentView={currentView}
+          onNavigate={handleNavigate}
+          currentPhase={electionPhase || currentPhase}
+          onPhaseChange={setCurrentPhase}
+        />
+      )}
+
+      {/* Main View Container */}
+      <main className={`flex-1 ${!isCustomLayout ? 'pb-24 lg:pb-12' : ''}`}>
         {currentView === 'overview' && (
           <OverviewView
             onNavigate={handleNavigate}
@@ -96,49 +126,63 @@ export default function App() {
             currentPhase={currentPhase}
           />
         )}
+
         {currentView === 'candidates' && (
           <CandidatesView onNavigate={handleNavigate} currentPhase={currentPhase} />
         )}
-        {(currentView === 'portal' || currentView === 'student-portal') && (
-          <StudentPortalView onNavigate={handleNavigate} />
+
+        {currentView === 'auth' && (
+          <AuthView onNavigate={handleNavigate} />
         )}
+
+        {currentView === 'portal' && (
+          currentUser ? (
+            <BallotView onNavigate={handleNavigate} />
+          ) : (
+            <AuthView onNavigate={handleNavigate} defaultMode="signup" />
+          )
+        )}
+
+        {currentView === 'commissioner' && (
+          <CommissionerDashboardView onNavigate={handleNavigate} />
+        )}
+
         {currentView === 'roles' && <RolesView onNavigate={handleNavigate} />}
+
         {(currentView === 'rules' || currentView === 'how-it-works') && (
           <RulesView
             onNavigate={handleNavigate}
             onOpenAudit={() => setIsAuditModalOpen(true)}
           />
         )}
+
         {(currentView === 'conduct' || currentView === 'code-of-conduct') && (
           <CodeOfConductView onNavigate={handleNavigate} />
         )}
+
         {currentView === 'results' && (
           <ResultsView
             onNavigate={handleNavigate}
             onOpenAudit={() => setIsAuditModalOpen(true)}
           />
         )}
+
         {currentView === 'help' && <HelpView onNavigate={handleNavigate} />}
-        {(currentView === 'commission' ||
-          currentView === 'commission-workspace' ||
-          currentView === 'governance') && (
-          <CommissionWorkspaceView
-            onNavigate={handleNavigate}
-            onOpenAudit={() => setIsAuditModalOpen(true)}
-            onOpenRehearsal={() => setIsRehearsalOpen(true)}
-          />
-        )}
       </main>
 
-      {/* Footer */}
-      <Footer
-        onNavigate={handleNavigate}
-        onOpenAudit={() => setIsAuditModalOpen(true)}
-        onOpenSecurity={() => setIsSecurityModalOpen(true)}
-      />
+      {/* Footer (Hidden during active ballot voting and commissioner sidebar mode) */}
+      {!isCustomLayout && (
+        <Footer
+          onNavigate={handleNavigate}
+          onOpenAudit={() => setIsAuditModalOpen(true)}
+          onOpenSecurity={() => setIsSecurityModalOpen(true)}
+        />
+      )}
 
-      {/* Mobile Bottom Navigation Bar (< 1024px) */}
-      <MobileBottomNav currentView={currentView} onNavigate={handleNavigate} />
+      {/* Mobile Bottom Navigation Bar (< 1024px) (Hidden during active ballot voting and commissioner sidebar mode) */}
+      {!isCustomLayout && (
+        <MobileBottomNav currentView={currentView} onNavigate={handleNavigate} />
+      )}
 
       {/* Global Modals */}
       <AuditDossierModal
@@ -154,5 +198,13 @@ export default function App() {
         onClose={() => setIsRehearsalOpen(false)}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <VotingStoreProvider>
+      <MainApp />
+    </VotingStoreProvider>
   );
 }

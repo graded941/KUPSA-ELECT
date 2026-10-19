@@ -312,7 +312,7 @@ export function CommissionWorkspaceView({
                 onClick={() => onNavigate('overview')}
                 className="text-xs text-muted-foreground hover:text-foreground underline font-mono"
               >
-                ← Return to Public Student Portal
+                ← Return to Vote
               </button>
             </div>
           </div>

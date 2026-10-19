@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ViewId, OfficeResult } from '../types';
-import { OFFICE_RESULTS, TURNOUT_METRICS } from '../data/election';
+import { OFFICE_RESULTS, TURNOUT_METRICS, getElectionPollingDate } from '../data/election';
+import { useVotingStore } from '../context/VotingStore';
 import { PageIntro } from './site-shell';
 import {
   Trophy,
@@ -11,7 +12,12 @@ import {
   Award,
   Download,
   Printer,
-  X
+  X,
+  Clock,
+  Lock,
+  ArrowRight,
+  AlertTriangle,
+  Calendar
 } from 'lucide-react';
 
 interface ResultsViewProps {
@@ -20,10 +26,43 @@ interface ResultsViewProps {
 }
 
 export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
+  const { isResultsLive } = useVotingStore();
+
   const [selectedOffice, setSelectedOffice] = useState<string>('all');
   const [searchReceipt, setSearchReceipt] = useState('');
   const [receiptVerificationResult, setReceiptVerificationResult] = useState<string | null>(null);
   const [showCertificateModal, setShowCertificateModal] = useState<OfficeResult | null>(null);
+
+  // Calculate target 5:00 PM (17:00 EAT) on Election Day
+  const electionClosureDate = useMemo(() => {
+    const d = getElectionPollingDate();
+    d.setHours(17, 0, 0, 0); // 5:00 PM
+    return d;
+  }, []);
+
+  // Live countdown state for embargo
+  const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number }>(() => {
+    const diff = Math.max(0, electionClosureDate.getTime() - Date.now());
+    return {
+      days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+      hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+      minutes: Math.floor((diff / 1000 / 60) % 60),
+      seconds: Math.floor((diff / 1000) % 60),
+    };
+  });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const diff = Math.max(0, electionClosureDate.getTime() - Date.now());
+      setTimeLeft({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((diff / 1000 / 60) % 60),
+        seconds: Math.floor((diff / 1000) % 60),
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [electionClosureDate]);
 
   const t = TURNOUT_METRICS;
 
@@ -41,10 +80,110 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
     (r) => selectedOffice === 'all' || r.officeId === selectedOffice
   );
 
+  // EMBARGO SCREEN: Shown when the Commission has set results to NOT LIVE
+  if (!isResultsLive) {
+    return (
+      <>
+        <PageIntro eyebrow="Official Embargo · Article 46" title="Results Sealed Until Polls Close">
+          Official election counts are cryptographically sealed under Article 46. The Chief Returning Officer will declare and unseal the verified tallies at 5:00 PM on Election Day.
+        </PageIntro>
+
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 py-12 sm:py-16">
+          <div className="rounded-3xl border-2 border-ink bg-card p-6 sm:p-12 shadow-pop text-center space-y-8 animate-in fade-in duration-300">
+            {/* Header Badge */}
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-mono text-primary font-bold">
+              <Lock className="h-3.5 w-3.5" />
+              <span>Official Gazettement Embargo Active</span>
+            </div>
+
+            {/* Countdown Title */}
+            <div>
+              <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-foreground tracking-tight">
+                Public Results Unseal In
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground font-mono">
+                Official Declaration: First Friday of November at 17:00 EAT (5:00 PM)
+              </p>
+            </div>
+
+            {/* 4 Countdown Blocks */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
+              {[
+                { label: 'Days', val: String(timeLeft.days).padStart(2, '0') },
+                { label: 'Hours', val: String(timeLeft.hours).padStart(2, '0') },
+                { label: 'Minutes', val: String(timeLeft.minutes).padStart(2, '0') },
+                { label: 'Seconds', val: String(timeLeft.seconds).padStart(2, '0') },
+              ].map((b) => (
+                <div
+                  key={b.label}
+                  className="rounded-2xl border-2 border-border bg-secondary/50 p-4 sm:p-6 text-center shadow-xs"
+                >
+                  <div className="font-mono text-3xl sm:text-5xl font-bold text-foreground">
+                    {b.val}
+                  </div>
+                  <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground mt-1 block">
+                    {b.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Institutional Information & Rule Box */}
+            <div className="rounded-2xl border border-border bg-secondary/30 p-5 text-left space-y-3 text-xs sm:text-sm text-foreground/85 leading-relaxed">
+              <div className="flex items-center gap-2 font-semibold text-foreground">
+                <ShieldCheck className="h-4 w-4 text-emerald-700" />
+                <span>Statutory Article 46 Declaration Protocol</span>
+              </div>
+              <p>
+                In accordance with Chapter Six of the KUPSA Constitution, ballot boxes remain under the physical custody of the Staff Patron and Chief Returning Officer until general voting closes at 17:00 EAT.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Counting occurs in the presence of certified candidate agents, independent faculty observers, and Dean of Pharmacy delegates. Certified tallies will appear here automatically upon declaration.
+              </p>
+            </div>
+
+            {/* Action Links */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => onNavigate('candidates')}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-6 py-3 text-xs font-semibold text-ink-foreground shadow-xs hover:bg-primary transition-colors cursor-pointer"
+              >
+                <span>Meet Cleared Candidates</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onNavigate('rules')}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-xs font-semibold text-foreground hover:bg-secondary transition-colors cursor-pointer"
+              >
+                <span>Read Constitutional Rules</span>
+              </button>
+            </div>
+
+            {/* Note for Commission Officer testing */}
+            <p className="text-[11px] font-mono text-muted-foreground pt-4 border-t border-border">
+              Testing Note: Commission Officers can toggle public results live in the{' '}
+              <button
+                type="button"
+                onClick={() => onNavigate('commissioner')}
+                className="text-primary underline font-bold cursor-pointer"
+              >
+                Electoral Commission Portal
+              </button>.
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // LIVE RESULTS: Displayed when isResultsLive is true
   return (
     <>
-      <PageIntro eyebrow="Results · Preview" title="Who students chose">
-        Sample results showing how the final declaration page operates. Each result tally is witnessed and signed off by candidate agents before announcement.
+      <PageIntro eyebrow="Results · Certified" title="Who students chose">
+        Certified declaration of the 2026 KUPSA General Elections. Each result tally is witnessed and signed off by candidate agents and the Staff Patron.
       </PageIntro>
 
       {/* Dark KPI Turnout Strip */}
@@ -95,17 +234,6 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
               </button>
             ))}
           </div>
-
-          {/* Audit Dossier CTA */}
-          {onOpenAudit && (
-            <button
-              onClick={onOpenAudit}
-              className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-ink bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-ink hover:text-ink-foreground transition-colors shrink-0"
-            >
-              <FileCheck className="h-4 w-4 text-primary" />
-              <span>Commission Audit Dossier</span>
-            </button>
-          )}
         </div>
 
         {/* Office Results Grid */}
@@ -125,231 +253,179 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
                       {r.constitutionalArticle} · {r.totalVotesCast.toLocaleString()} votes cast
                     </p>
                   </div>
-                  <span className="rounded-full bg-secondary border border-border px-3 py-1 text-xs font-semibold text-foreground shrink-0">
+                  <span className="flex items-center gap-1.5 rounded-full bg-success/15 px-3 py-1 font-mono text-xs font-semibold text-success">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
                     {r.status}
                   </span>
                 </div>
 
-                {/* Candidate Tallies */}
-                <ul className="mt-6 space-y-4">
-                  {r.candidateTallies.map((c) => (
-                    <li key={c.candidateId}>
-                      <div className="flex items-center justify-between text-sm mb-1.5">
-                        <span className="flex items-center gap-2 font-medium text-foreground">
-                          {c.isWinner && (
-                            <Trophy className="h-4 w-4 text-primary shrink-0" />
-                          )}
-                          <span className={c.isWinner ? 'font-bold' : ''}>{c.candidateName}</span>
-                          {c.isWinner && (
-                            <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">
-                              Winner
-                            </span>
-                          )}
-                        </span>
-                        <span className="font-mono text-xs text-muted-foreground font-semibold">
-                          {c.votes.toLocaleString()} votes · {c.percentage.toFixed(1)}%
-                        </span>
+                {/* Candidate Vote Breakdown */}
+                <div className="mt-6 space-y-4">
+                  {r.candidateTallies.map((c) => {
+                    return (
+                      <div key={c.candidateName} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className={`font-semibold flex items-center gap-1.5 ${c.isWinner ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            {c.isWinner && <Trophy className="h-4 w-4 text-primary shrink-0" />}
+                            {c.candidateName}
+                          </span>
+                          <span className="font-mono text-xs text-muted-foreground">
+                            <strong className="text-foreground">{c.votes.toLocaleString()}</strong> ({c.percentage}%)
+                          </span>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="h-3 w-full rounded-full bg-secondary overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              c.isWinner ? 'bg-primary' : 'bg-ink/60'
+                            }`}
+                            style={{ width: `${c.percentage}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-3 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className={`h-full rounded-full transition-all duration-700 ${
-                            c.isWinner ? 'bg-brand' : 'bg-ink/30'
-                          }`}
-                          style={{ width: `${c.percentage}%` }}
-                        />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Card Footer: Agent Signoffs & Certificate trigger */}
-              <div className="mt-6 pt-4 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5 font-medium">
-                  <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-                  <span>
-                    {r.agentSignoffs.filter((a) => a.signed).length} of {r.agentSignoffs.length} agents signed
-                  </span>
-                  <span>· {r.spoiltOrBlanks} spoilt</span>
-                </span>
-                <button
-                  onClick={() => setShowCertificateModal(r)}
-                  className="font-mono text-primary font-semibold hover:underline"
-                >
-                  View Certificate →
-                </button>
-              </div>
+              {/* Bottom Certificate Verification Link */}
+              {(() => {
+                const winner = r.candidateTallies.find((c) => c.isWinner) || r.candidateTallies[0];
+                return (
+                  <div className="mt-6 pt-4 border-t border-border flex items-center justify-between">
+                    <span className="text-xs font-mono text-muted-foreground">
+                      Winner: <strong className="text-foreground">{winner?.candidateName}</strong> ({winner?.percentage}%)
+                    </span>
+                    <button
+                      onClick={() => setShowCertificateModal(r)}
+                      className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                    >
+                      View Gazettement Notice →
+                    </button>
+                  </div>
+                );
+              })()}
             </article>
           ))}
         </div>
 
-        {/* Turnout by Cohort Year */}
-        <section className="rounded-2xl border-2 border-border bg-card p-6 sm:p-8 shadow-card">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-4">
+        {/* Voter Anonymous Receipt Hash Verifier */}
+        <div className="rounded-2xl border-2 border-border bg-card p-6 sm:p-8 shadow-card space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-ink text-ink-foreground">
+              <ShieldCheck className="h-5 w-5" />
+            </span>
             <div>
-              <h3 className="font-display text-2xl font-semibold text-foreground">
-                Turnout by academic cohort
+              <h3 className="font-display text-xl font-bold text-foreground">
+                Verify Your Anonymous Ballot Hash
               </h3>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Voter participation breakdown by year of pharmacy study
+              <p className="text-xs text-muted-foreground">
+                Enter the receipt code given when you voted to verify your ballot was counted.
               </p>
             </div>
-            <span className="font-mono text-xs text-primary font-semibold">
-              Dean's Roll Verification
-            </span>
           </div>
 
-          <div className="mt-6 space-y-4">
-            {t.turnoutByCohort.map((c) => (
-              <div
-                key={c.year}
-                className="grid grid-cols-[8rem_1fr_4rem] sm:grid-cols-[14rem_1fr_4.5rem] items-center gap-4 text-sm"
-              >
-                <div className="flex flex-col">
-                  <span className="font-medium text-foreground text-xs sm:text-sm">{c.year}</span>
-                  <span className="text-[11px] font-mono text-muted-foreground">
-                    {c.voted} / {c.registered} voted
-                  </span>
-                </div>
-                <div className="h-3 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="bg-brand h-full rounded-full transition-all duration-500"
-                    style={{ width: `${c.percentage}%` }}
-                  />
-                </div>
-                <span className="text-right font-mono font-semibold text-xs sm:text-sm text-foreground">
-                  {c.percentage.toFixed(0)}%
-                </span>
+          <form onSubmit={handleVerifyReceipt} className="flex flex-col sm:flex-row gap-3 pt-2">
+            <input
+              type="text"
+              value={searchReceipt}
+              onChange={(e) => {
+                setSearchReceipt(e.target.value);
+                setReceiptVerificationResult(null);
+              }}
+              placeholder="e.g. KUPSA-2026-REC-XXXXX"
+              className="flex-1 rounded-xl border border-border bg-background py-2.5 px-4 text-sm font-mono text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+            />
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-6 py-2.5 text-xs font-semibold text-ink-foreground shadow-xs hover:bg-primary transition-colors cursor-pointer"
+            >
+              <Search className="h-4 w-4" />
+              <span>Verify Ballot</span>
+            </button>
+          </form>
+
+          {receiptVerificationResult === 'CONFIRMED_VALID' && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs text-emerald-800 flex items-start gap-2.5 animate-in fade-in">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-sm">Ballot Confirmed & Witnessed</p>
+                <p className="mt-0.5 text-emerald-700">
+                  This anonymous receipt was verified against the certified Electoral Commission registry. The vote is counted in the official results declaration.
+                </p>
               </div>
-            ))}
-          </div>
-        </section>
+            </div>
+          )}
 
-        {/* Receipt Verification Tool */}
-        <section className="rounded-2xl border-2 border-ink bg-card p-6 sm:p-8 shadow-pop">
-          <div className="max-w-2xl space-y-2">
-            <span className="eyebrow text-primary">Cryptographic Audit</span>
-            <h3 className="font-display text-2xl font-semibold text-foreground">
-              Verify your balloting receipt
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Check if your anonymous voting token hash is accounted for in the certified tally ledger.
-            </p>
-
-            <form onSubmit={handleVerifyReceipt} className="mt-4 flex flex-col sm:flex-row gap-3">
-              <input
-                value={searchReceipt}
-                onChange={(e) => setSearchReceipt(e.target.value)}
-                placeholder="Paste receipt code or hash proof..."
-                className="flex-1 rounded-xl border-2 border-border bg-background px-4 py-2.5 font-mono text-xs outline-none focus:border-ink"
-              />
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-5 py-2.5 text-xs font-semibold text-ink-foreground hover:bg-primary transition-colors shrink-0"
-              >
-                <Search className="h-3.5 w-3.5" />
-                <span>Verify Proof</span>
-              </button>
-            </form>
-
-            {receiptVerificationResult === 'CONFIRMED_VALID' && (
-              <div className="mt-4 rounded-xl bg-success/10 border border-success/30 p-4 text-success text-xs font-mono flex items-start gap-2 animate-in fade-in">
-                <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold">RECEIPT VERIFIED & RECORDED</p>
-                  <p className="mt-1 text-foreground/80 font-sans">
-                    This encrypted ballot was validated in the virtual ballot box at block #2026-NOV. Zero identity disclosure.
-                  </p>
-                </div>
+          {receiptVerificationResult === 'INVALID_HASH' && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive flex items-start gap-2.5 animate-in fade-in">
+              <X className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-sm">Receipt Not Found in Certified Roll</p>
+                <p className="mt-0.5">
+                  Please verify your receipt format. If you suspect an error, contact the Commission Secretariat.
+                </p>
               </div>
-            )}
-
-            {receiptVerificationResult === 'INVALID_HASH' && (
-              <div className="mt-4 rounded-xl bg-destructive/10 border border-destructive/30 p-4 text-destructive text-xs font-mono animate-in fade-in">
-                Receipt code not found in current certified batch. Ensure the code begins with KUPSA-2026.
-              </div>
-            )}
-          </div>
-        </section>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Certificate Modal */}
       {showCertificateModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 backdrop-blur-xs p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 backdrop-blur-xs p-4 animate-in fade-in"
           onClick={() => setShowCertificateModal(null)}
         >
           <div
-            className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl border-2 border-ink bg-card p-6 sm:p-8 shadow-pop animate-in zoom-in-95"
+            className="w-full max-w-lg rounded-2xl border-2 border-ink bg-card p-6 sm:p-8 shadow-pop space-y-5 animate-in zoom-in-95"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between border-b border-border pb-4">
-              <div className="flex items-center gap-3">
-                <span className="bg-brand flex h-12 w-12 items-center justify-center rounded-2xl text-ink shadow-xs">
-                  <Award className="h-6 w-6" />
-                </span>
-                <div>
-                  <span className="eyebrow text-primary">Certificate of Results</span>
-                  <h3 className="font-display text-2xl font-semibold text-foreground">
-                    {showCertificateModal.officeTitle}
-                  </h3>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowCertificateModal(null)}
-                className="rounded-full p-2 hover:bg-secondary text-muted-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="mt-6 space-y-4 text-sm">
-              <div className="rounded-xl bg-secondary/50 p-4 border border-border">
-                <p className="font-mono text-xs text-muted-foreground">Certified Winner:</p>
-                <p className="font-display text-xl font-bold text-foreground mt-0.5">
-                  {showCertificateModal.candidateTallies.find((c) => c.isWinner)?.candidateName ?? 'Declared Majority'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Received {showCertificateModal.candidateTallies.find((c) => c.isWinner)?.votes} votes (
-                  {showCertificateModal.candidateTallies.find((c) => c.isWinner)?.percentage.toFixed(1)}%) of valid votes cast.
-                </p>
-              </div>
-
+            <div className="flex items-start justify-between border-b border-border pb-3">
               <div>
-                <h4 className="font-semibold text-foreground text-xs uppercase font-mono tracking-wider mb-2">
-                  Agent Signoffs:
-                </h4>
-                <div className="space-y-1.5">
-                  {showCertificateModal.agentSignoffs.map((a) => (
-                    <div
-                      key={a.agentName}
-                      className="flex items-center justify-between text-xs rounded-lg border border-border p-2.5 bg-background"
-                    >
-                      <span>
-                        {a.agentName} <span className="text-muted-foreground">({a.candidateName})</span>
-                      </span>
-                      <span className="flex items-center gap-1 font-semibold text-success font-mono text-[11px]">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> SIGNED & ATTESTED
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <span className="eyebrow text-primary font-bold">Official Certificate</span>
+                <h3 className="font-display text-2xl font-bold text-foreground">
+                  Gazettement of Winner
+                </h3>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowCertificateModal(null)}
+                className="text-muted-foreground hover:text-foreground text-xs font-mono font-bold"
+              >
+                Close ✕
+              </button>
             </div>
 
-            <div className="mt-8 pt-4 border-t border-border flex gap-3">
+            {(() => {
+              const winner = showCertificateModal.candidateTallies.find((c) => c.isWinner) || showCertificateModal.candidateTallies[0];
+              return (
+                <div className="rounded-xl border-2 border-border p-5 space-y-3 bg-background">
+                  <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                    Office: {showCertificateModal.officeTitle}
+                  </p>
+                  <h4 className="font-display text-xl font-bold text-foreground">
+                    {winner?.candidateName}
+                  </h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Duly elected with <strong>{winner?.votes.toLocaleString()} votes ({winner?.percentage}%)</strong> out of {showCertificateModal.totalVotesCast.toLocaleString()} votes cast.
+                  </p>
+                  <div className="pt-2 border-t border-border flex items-center justify-between text-[11px] font-mono text-muted-foreground">
+                    <span>Certified: Nov 06, 2026</span>
+                    <span className="text-emerald-700 font-semibold">Signed by Patron</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="flex justify-end pt-2">
               <button
-                onClick={() => window.print()}
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border-2 border-ink py-2.5 text-xs font-semibold text-foreground hover:bg-secondary"
-              >
-                <Printer className="h-4 w-4" />
-                <span>Print Declaration</span>
-              </button>
-              <button
+                type="button"
                 onClick={() => setShowCertificateModal(null)}
-                className="rounded-xl bg-ink px-6 py-2.5 text-xs font-semibold text-ink-foreground hover:bg-primary"
+                className="rounded-xl bg-ink px-5 py-2 text-xs font-semibold text-ink-foreground hover:bg-primary transition-colors cursor-pointer"
               >
-                Close
+                Done
               </button>
             </div>
           </div>

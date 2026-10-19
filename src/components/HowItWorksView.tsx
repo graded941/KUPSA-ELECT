@@ -339,7 +339,7 @@ export const HowItWorksView: React.FC<HowItWorksViewProps> = ({ onNavigate }) =>
             onClick={() => onNavigate('student-portal')}
             className="w-full sm:w-auto px-4 py-2.5 bg-[#286746] hover:bg-[#327a54] text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors inline-flex items-center justify-center gap-1.5 min-h-[42px]"
           >
-            <span>Test in Student Portal</span>
+            <span>Test in Vote</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

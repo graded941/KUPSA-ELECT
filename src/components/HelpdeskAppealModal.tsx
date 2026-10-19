@@ -126,7 +126,7 @@ export const HelpdeskAppealModal: React.FC<HelpdeskAppealModalProps> = ({
                 onClick={handleReset}
                 className="w-full py-3 bg-[#286746] hover:bg-[#194a31] text-white font-semibold rounded-xl cursor-pointer transition-colors min-h-[44px]"
               >
-                Return to Student Portal
+                Return to Vote
               </button>
             </div>
           </div>

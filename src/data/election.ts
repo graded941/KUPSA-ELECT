@@ -1,4 +1,5 @@
 export * from './mockData';
+export * from './candidateData';
 import { ElectionMilestone } from '../types';
 
 /**

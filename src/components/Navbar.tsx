@@ -40,7 +40,7 @@ export function Navbar({ currentView, onNavigate, currentPhase }: NavbarProps) {
   const isActive = (id: ViewId) => {
     if (id === currentView) return true;
     if (id === 'portal' && currentView === 'student-portal') return true;
-    if (id === 'commission' && (currentView === 'commission-workspace' || currentView === 'governance')) return true;
+    if ((id === 'commissioner' || id === 'commission') && (currentView === 'commissioner' || currentView === 'commission-workspace' || currentView === 'governance')) return true;
     if (id === 'rules' && currentView === 'how-it-works') return true;
     if (id === 'conduct' && currentView === 'code-of-conduct') return true;
     return false;
@@ -104,7 +104,7 @@ export function Navbar({ currentView, onNavigate, currentPhase }: NavbarProps) {
             }`}
           >
             <Vote className="h-4 w-4" />
-            <span>Student portal</span>
+            <span>Vote</span>
           </button>
 
           {/* Mobile Menu Button */}
