@@ -7,7 +7,6 @@ import {
   X,
   FileText,
   AlertCircle,
-  PlusCircle,
   Award,
   Users,
   Coins,
@@ -468,15 +467,6 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
                   <span>{sortOrder === 'alpha' ? 'Sort: A–Z (Statutory)' : 'Sort: Ballot Draw'}</span>
                 </button>
               </div>
-
-              {/* File Nomination Papers Button */}
-              <button
-                onClick={() => setShowNominationModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-full border-2 border-ink bg-card px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-ink hover:text-ink-foreground shrink-0 transition-colors"
-              >
-                <PlusCircle className="h-3.5 w-3.5 text-primary" />
-                <span>File Papers</span>
-              </button>
             </div>
 
             {/* Bottom Row: Office Sliding Navigation Tabs */}
