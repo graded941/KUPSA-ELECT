@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ViewId } from '../types';
 import { useVotingStore } from '../context/VotingStore';
 import { SHARED_OFFICES, SHARED_CANDIDATES, SharedCandidate, SharedOffice } from '../data/candidateData';
@@ -28,7 +28,8 @@ interface BallotViewProps {
 }
 
 export function BallotView({ onNavigate }: BallotViewProps) {
-  const { currentUser, logout, castVote } = useVotingStore();
+  const { currentUser, logout, castVote, dbOffices, dbCandidates, isLoadingDb } = useVotingStore();
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // If no user is logged in, redirect to auth
   useEffect(() => {
@@ -51,17 +52,67 @@ export function BallotView({ onNavigate }: BallotViewProps) {
   // Inspect Manifesto modal
   const [manifestoModalCandidate, setManifestoModalCandidate] = useState<SharedCandidate | null>(null);
 
+  // Derive dynamic offices & candidates from DB
+  const effectiveOffices: SharedOffice[] = useMemo(() => {
+    if (dbOffices.length > 0) {
+      return dbOffices.map((o) => ({
+        id: o.id,
+        title: o.title,
+        description: o.description,
+        seats: 1,
+        constitutionalArticle: 'Article 42',
+        term: '2026/2027 Academic Year',
+      }));
+    }
+    return SHARED_OFFICES;
+  }, [dbOffices]);
+
+  const effectiveCandidates: SharedCandidate[] = useMemo(() => {
+    if (dbCandidates.length > 0) {
+      return dbCandidates.map((c) => {
+        const off = effectiveOffices.find((o) => o.id === c.office_id);
+        const initials = c.name
+          .split(' ')
+          .map((n) => n[0])
+          .join('')
+          .toUpperCase()
+          .slice(0, 2);
+
+        return {
+          id: c.id,
+          name: c.name,
+          initials: initials || 'CA',
+          officeId: c.office_id,
+          officeTitle: off ? off.title : 'Executive Seat',
+          yearOfStudy: c.year_of_study || 'Bachelor of Pharmacy',
+          status: 'Cleared' as const,
+          photoUrl: c.photo_url,
+          photoPlaceholderBg: '#0B1B3D',
+          manifestoSummary: c.manifesto_summary || 'Serving pharmacy students with transparency.',
+          manifestoPillars: [
+            c.manifesto_summary || 'Promote student academic excellence',
+            'Enhance clinical rotation welfare and supplies',
+            'Maintain transparent association financial records',
+          ],
+        };
+      });
+    }
+    return SHARED_CANDIDATES;
+  }, [dbCandidates, effectiveOffices]);
+
   // Filter offices that have candidates
-  const officesWithCandidates = SHARED_OFFICES.map((office) => {
-    const cands = SHARED_CANDIDATES
-      .filter((c) => c.officeId === office.id)
-      .sort((a, b) => a.name.localeCompare(b.name));
-    return {
-      ...office,
-      candidates: cands,
-      hasCandidates: cands.length > 0,
-    };
-  });
+  const officesWithCandidates: (SharedOffice & { candidates: SharedCandidate[]; hasCandidates: boolean })[] = useMemo(() => {
+    return effectiveOffices.map((office) => {
+      const cands = effectiveCandidates
+        .filter((c) => c.officeId === office.id)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      return {
+        ...office,
+        candidates: cands,
+        hasCandidates: cands.length > 0,
+      };
+    });
+  }, [effectiveOffices, effectiveCandidates]);
 
   // Active offices requiring voter decision (excludes empty offices)
   const activeOffices = officesWithCandidates.filter((o) => o.hasCandidates);
@@ -105,6 +156,7 @@ export function BallotView({ onNavigate }: BallotViewProps) {
     if (!confirmedDeclaration || isSubmittingVote) return;
 
     setIsSubmittingVote(true);
+    setSubmitError(null);
     try {
       const res = await castVote(selections);
       setIsSubmittingVote(false);
@@ -113,8 +165,9 @@ export function BallotView({ onNavigate }: BallotViewProps) {
         receiptCode: res.receiptCode,
         timestamp: res.timestamp,
       });
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setSubmitError(e.message || 'Failed to seal ballot.');
       setIsSubmittingVote(false);
     }
   };
@@ -685,7 +738,7 @@ export function BallotView({ onNavigate }: BallotViewProps) {
                 <div className="divide-y divide-border rounded-2xl border-2 border-border bg-background/50 overflow-hidden">
                   {activeOffices.map((office) => {
                     const choiceId = selections[office.id];
-                    const chosenCandidate = SHARED_CANDIDATES.find((c) => c.id === choiceId);
+                    const chosenCandidate = effectiveCandidates.find((c) => c.id === choiceId);
                     const isAbstain = choiceId === 'abstain';
 
                     return (
@@ -727,6 +780,17 @@ export function BallotView({ onNavigate }: BallotViewProps) {
                   })}
                 </div>
               </div>
+
+              {/* Submit Error Banner if rejected by DB */}
+              {submitError && (
+                <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-xs text-destructive flex items-start gap-2.5 animate-in fade-in">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Ballot Submission Error</p>
+                    <p className="mt-0.5 text-foreground/90">{submitError}</p>
+                  </div>
+                </div>
+              )}
 
               {/* Declaration Checkbox */}
               <div className="rounded-xl border border-border bg-secondary/30 p-4">

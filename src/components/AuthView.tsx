@@ -85,7 +85,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
       : null;
 
   // Handle Sign Up
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailTouched(true);
     setSignupError(null);
@@ -101,7 +101,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
     }
 
     setIsSubmitting(true);
-    const res = signUp(fullName, signupEmail, yearOfStudy);
+    const res = await signUp(fullName, signupEmail, yearOfStudy);
     setIsSubmitting(false);
 
     if (!res.success) {

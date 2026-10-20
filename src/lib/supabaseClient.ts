@@ -1,8 +1,12 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Environment variables exposed to Vite client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const rawSupabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+// Strip trailing slashes and /rest/v1 if inadvertently pasted from dashboard REST docs
+const supabaseUrl = rawSupabaseUrl
+  .replace(/\/rest\/v1\/?$/i, '')
+  .replace(/\/+$/, '');
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
 /**
  * Returns true if both the Supabase URL and Anon key have been provided in the environment.
@@ -10,10 +14,11 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 export const isSupabaseConfigured = (): boolean => {
   return (
     typeof supabaseUrl === 'string' &&
-    supabaseUrl.trim() !== '' &&
+    supabaseUrl !== '' &&
     !supabaseUrl.includes('your-project-id') &&
+    !supabaseUrl.includes('your-project-ref') &&
     typeof supabaseAnonKey === 'string' &&
-    supabaseAnonKey.trim() !== '' &&
+    supabaseAnonKey !== '' &&
     !supabaseAnonKey.includes('your-anon-key')
   );
 };

@@ -1,6 +1,21 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { SHARED_OFFICES, SHARED_CANDIDATES } from '../data/candidateData';
-import { SAMPLE_STUDENTS } from '../data/mockData';
+import {
+  fetchLiveElectionState,
+  castSecretBallotApi,
+  seedElectionDatabaseApi,
+  updateElectionSettingsApi,
+  updateCandidateClearanceApi,
+  updateVoterAccreditationApi,
+  registerVoterApi,
+  resetAllBallotsApi,
+  subscribeToElectionRealtime,
+  DbOffice,
+  DbCandidate,
+  DbVoter,
+  DbBallot,
+  ConnectionStatus,
+} from '../lib/electionService';
 
 export interface VoterUser {
   email: string;
@@ -53,11 +68,24 @@ interface VotingStoreContextType {
   simulatedEmails: SimulatedEmail[];
   lastCastVote: CastVote | null;
   totalRegistered: number;
-  
+
+  // Supabase Database Status
+  isLoadingDb: boolean;
+  dbError: string | null;
+  isRealtimeConnected: boolean;
+  lastSyncTime: string | null;
+  refreshDbState: () => Promise<void>;
+  seedOfficialRoster: () => Promise<{ success: boolean; message: string }>;
+  resetAllBallots: () => Promise<void>;
+
+  // Dynamic DB entities
+  dbOffices: DbOffice[];
+  dbCandidates: DbCandidate[];
+
   // Results Live / Not Live Control
   isResultsLive: boolean;
   setIsResultsLive: (val: boolean) => void;
-  
+
   // Election Phase & Broadcast Notice Control
   electionPhase: 'pre-election' | 'polling-live' | 'counting' | 'results-declared';
   setElectionPhase: (phase: 'pre-election' | 'polling-live' | 'counting' | 'results-declared') => void;
@@ -66,7 +94,16 @@ interface VotingStoreContextType {
 
   // Candidate Clearance Management
   candidateClearances: Record<string, CandidateClearanceRecord>;
-  updateCandidateClearance: (candidateId: string, status: 'Cleared & Certified' | 'Under Review' | 'Provisional', notes: string) => void;
+  updateCandidateClearance: (
+    candidateId: string,
+    status: 'Cleared & Certified' | 'Under Review' | 'Provisional',
+    notes: string,
+    extra?: {
+      name?: string;
+      photoUrl?: string;
+      manifestoSummary?: string;
+    }
+  ) => void;
 
   // Voter Roll & Accreditation Management
   accreditationList: StudentAccreditationRecord[];
@@ -74,7 +111,7 @@ interface VotingStoreContextType {
   resetUserVoteStatus: (email: string) => void;
 
   // Auth actions
-  signUp: (name: string, email: string, yearOfStudy: string) => { success: boolean; error?: string; password?: string; user?: VoterUser };
+  signUp: (name: string, email: string, yearOfStudy: string) => Promise<{ success: boolean; error?: string; password?: string; user?: VoterUser }>;
   login: (email: string, password: string) => { success: boolean; error?: string; user?: VoterUser };
   logout: () => void;
   castVote: (choices: Record<string, string>) => Promise<{ success: boolean; receiptCode: string; timestamp: string }>;
@@ -84,121 +121,37 @@ interface VotingStoreContextType {
   resendEmail: (email: string) => boolean;
 }
 
-const USERS_STORAGE_KEY = 'kupsa_voters_v4';
-const SESSION_STORAGE_KEY = 'kupsa_session_v4';
-const VOTES_STORAGE_KEY = 'kupsa_votes_v4';
-const EMAILS_STORAGE_KEY = 'kupsa_emails_v4';
-const RESULTS_LIVE_KEY = 'kupsa_results_live_v4';
-const PHASE_STORAGE_KEY = 'kupsa_phase_v4';
-const BANNER_STORAGE_KEY = 'kupsa_banner_v4';
-const CLEARANCE_STORAGE_KEY = 'kupsa_clearances_v4';
-const ACCREDITATION_STORAGE_KEY = 'kupsa_accreditation_v4';
-
-// Initial default seed users
-const INITIAL_USERS: VoterUser[] = [
-  {
-    email: 'john.doe@kabarak.ac.ke',
-    name: 'John Kipruto',
-    yearOfStudy: 'Year 3',
-    password: 'KUP-2026',
-    hasVoted: false,
-  },
-  {
-    email: 'sarah.cherono@kabarak.ac.ke',
-    name: 'Sarah Cherono',
-    yearOfStudy: 'Year 4',
-    password: 'KUP-2026',
-    hasVoted: true,
-    votedAt: 'Today at 09:42 EAT',
-    receiptCode: 'KUPSA-2026-REC-8921B',
-  },
-  {
-    email: 'wnjeri23@kabarak.ac.ke',
-    name: 'Wairimu Njeri',
-    yearOfStudy: 'Year 3',
-    password: 'KUP-2026',
-    hasVoted: false,
-  },
-  {
-    email: 'ekiprono22@kabarak.ac.ke',
-    name: 'Emmanuel Kiprono',
-    yearOfStudy: 'Year 4',
-    password: 'KUP-2026',
-    hasVoted: false,
-  },
-  {
-    email: 'sakinyi24@kabarak.ac.ke',
-    name: 'Stacy Akinyi',
-    yearOfStudy: 'Year 2',
-    password: 'KUP-2026',
-    hasVoted: false,
-  }
-];
-
-// Initial candidate clearance records
-const INITIAL_CLEARANCES: Record<string, CandidateClearanceRecord> = {
-  'cand-01': { status: 'Cleared & Certified', notes: 'Academic GPA > 3.0 confirmed. Clean conduct certification by School Patron.', updatedAt: 'Today, 08:30 EAT' },
-  'cand-02': { status: 'Cleared & Certified', notes: 'All statutory nomination endorsements verified by Commission Secretary.', updatedAt: 'Today, 08:30 EAT' },
-  'cand-03': { status: 'Cleared & Certified', notes: 'Welfare committee clearance and registrar academic standing confirmed.', updatedAt: 'Today, 08:35 EAT' },
-  'cand-07': { status: 'Cleared & Certified', notes: 'Clinical rotations standing confirmed by Level 5 Hospital preceptor.', updatedAt: 'Today, 08:35 EAT' },
-  'cand-04': { status: 'Cleared & Certified', notes: 'Constitutional editorial ethics oath signed and sealed.', updatedAt: 'Today, 08:40 EAT' },
-  'cand-05': { status: 'Cleared & Certified', notes: 'CPA Section 1 certification verified; financial bond registered.', updatedAt: 'Today, 08:40 EAT' },
-  'cand-06': { status: 'Cleared & Certified', notes: 'Sports and logistics patron approval certified.', updatedAt: 'Today, 08:45 EAT' },
-};
-
-// Initial accreditation registry
-function generateInitialAccreditation(): StudentAccreditationRecord[] {
-  return SAMPLE_STUDENTS.map((s) => ({
-    regNo: s.regNo,
-    name: s.name,
-    email: s.email,
-    yearOfStudy: s.yearOfStudy,
-    status: s.status,
-    reason: s.reason,
-    hasVoted: s.email === 'sarah.cherono@kabarak.ac.ke',
-  }));
-}
-
-// Initial seed votes for realistic tallies
-function generateInitialVotes(): CastVote[] {
-  const seedVotes: CastVote[] = [];
-  const years = ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'];
-  const now = new Date();
-
-  // Create 247 realistic votes
-  const count = 247;
-  for (let i = 0; i < count; i++) {
-    const minutesAgo = Math.floor(Math.random() * 360) + 10;
-    const voteTime = new Date(now.getTime() - minutesAgo * 60000);
-    const timeStr = voteTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    
-    // Weighted choice selection
-    const choices: Record<string, string> = {
-      chairperson: Math.random() < 0.53 ? 'cand-01' : 'cand-02',
-      'vice-chairperson': Math.random() < 0.58 ? 'cand-03' : 'cand-07',
-      'sec-general': Math.random() < 0.88 ? 'cand-04' : 'abstain',
-      treasurer: Math.random() < 0.91 ? 'cand-05' : 'abstain',
-      'org-sec': Math.random() < 0.85 ? 'cand-06' : 'abstain',
-      'academic-sec': 'abstain',
-    };
-
-    seedVotes.push({
-      id: `seed-vote-${i + 1}`,
-      timestamp: timeStr,
-      fullTimestamp: voteTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }),
-      choices,
-      voterYear: years[i % years.length] ?? 'Year 3',
-      receiptCode: `KUPSA-2026-REC-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
-    });
-  }
-
-  return seedVotes.reverse();
-}
+const USERS_STORAGE_KEY = 'kupsa_voters_v5';
+const SESSION_STORAGE_KEY = 'kupsa_session_v5';
+const EMAILS_STORAGE_KEY = 'kupsa_emails_v5';
 
 const VotingStoreContext = createContext<VotingStoreContextType | null>(null);
 
 export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // 1. Users state
+  // DB Connection & Status States
+  const [isLoadingDb, setIsLoadingDb] = useState<boolean>(true);
+  const [dbError, setDbError] = useState<string | null>(null);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+
+  // Entities synced with Supabase
+  const [dbOffices, setDbOffices] = useState<DbOffice[]>([]);
+  const [dbCandidates, setDbCandidates] = useState<DbCandidate[]>([]);
+  const [votes, setVotes] = useState<CastVote[]>([]);
+  const [lastCastVote, setLastCastVote] = useState<CastVote | null>(null);
+
+  // Settings
+  const [isResultsLive, setIsResultsLiveState] = useState<boolean>(true);
+  const [electionPhase, setElectionPhaseState] = useState<'pre-election' | 'polling-live' | 'counting' | 'results-declared'>('polling-live');
+  const [announcementBanner, setAnnouncementBannerState] = useState<string>(
+    'Official Notice: General Polling in session under Chapter Six statutory authority.'
+  );
+
+  // Clearances & Accreditation lists
+  const [candidateClearances, setCandidateClearances] = useState<Record<string, CandidateClearanceRecord>>({});
+  const [accreditationList, setAccreditationList] = useState<StudentAccreditationRecord[]>([]);
+
+  // Local/Session Users
   const [users, setUsers] = useState<VoterUser[]>(() => {
     try {
       const saved = localStorage.getItem(USERS_STORAGE_KEY);
@@ -206,10 +159,24 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     } catch (e) {
       console.error(e);
     }
-    return INITIAL_USERS;
+    return [
+      {
+        email: 'john.doe@kabarak.ac.ke',
+        name: 'John Kipruto',
+        yearOfStudy: 'Year 3',
+        password: 'KUP-2026',
+        hasVoted: false,
+      },
+      {
+        email: 'sarah.cherono@kabarak.ac.ke',
+        name: 'Sarah Cherono',
+        yearOfStudy: 'Year 4',
+        password: 'KUP-2026',
+        hasVoted: false,
+      },
+    ];
   });
 
-  // 2. Current Session state
   const [currentUser, setCurrentUser] = useState<VoterUser | null>(() => {
     try {
       const saved = localStorage.getItem(SESSION_STORAGE_KEY);
@@ -220,18 +187,6 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return null;
   });
 
-  // 3. Votes state
-  const [votes, setVotes] = useState<CastVote[]>(() => {
-    try {
-      const saved = localStorage.getItem(VOTES_STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return generateInitialVotes();
-  });
-
-  // 4. Simulated Emails
   const [simulatedEmails, setSimulatedEmails] = useState<SimulatedEmail[]>(() => {
     try {
       const saved = localStorage.getItem(EMAILS_STORAGE_KEY);
@@ -251,65 +206,180 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     ];
   });
 
-  // 5. Results Live Toggle (default: true for testing as requested)
-  const [isResultsLive, setIsResultsLive] = useState<boolean>(() => {
+  // Convert DbBallot to internal CastVote
+  const formatDbBallot = useCallback((b: DbBallot): CastVote => {
+    const d = b.created_at ? new Date(b.created_at) : new Date();
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    const fullTimeStr = `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · ${timeStr} EAT`;
+
+    return {
+      id: b.id || `ballot-${b.receipt_code}`,
+      timestamp: timeStr,
+      fullTimestamp: fullTimeStr,
+      choices: b.choices || {},
+      voterYear: b.voter_year || 'Year 3',
+      receiptCode: b.receipt_code,
+    };
+  }, []);
+
+  // Fetch full state from Supabase
+  const refreshDbState = useCallback(async () => {
+    setIsLoadingDb(true);
+    setDbError(null);
     try {
-      const saved = localStorage.getItem(RESULTS_LIVE_KEY);
-      if (saved !== null) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
+      const state = await fetchLiveElectionState();
+
+      // 1. Settings
+      if (state.settings) {
+        setIsResultsLiveState(state.settings.is_results_live ?? true);
+        if (state.settings.election_phase) {
+          setElectionPhaseState(state.settings.election_phase);
+        }
+        if (state.settings.announcement_banner) {
+          setAnnouncementBannerState(state.settings.announcement_banner);
+        }
+      }
+
+      // 2. Offices
+      setDbOffices(state.offices || []);
+
+      // 3. Candidates & Clearances
+      setDbCandidates(state.candidates || []);
+      const clearanceMap: Record<string, CandidateClearanceRecord> = {};
+      (state.candidates || []).forEach((c) => {
+        clearanceMap[c.id] = {
+          status: c.clearance_status || 'Cleared & Certified',
+          notes: c.clearance_notes || 'Nomination cleared under Chapter Six rules.',
+          updatedAt: c.created_at ? new Date(c.created_at).toLocaleTimeString() : 'Certified',
+        };
+      });
+      setCandidateClearances(clearanceMap);
+
+      // 4. Voters & Accreditation
+      if (state.voters && state.voters.length > 0) {
+        const accList: StudentAccreditationRecord[] = state.voters.map((v) => ({
+          regNo: v.reg_no,
+          name: v.full_name,
+          email: v.email,
+          yearOfStudy: v.year_of_study,
+          status: v.accreditation_status || 'Eligible',
+          reason: v.accreditation_status === 'Eligible' ? 'Accredited by Commission Secretariat.' : 'Under review.',
+          hasVoted: Boolean(v.has_voted),
+        }));
+        setAccreditationList(accList);
+
+        // Sync currentUser hasVoted status if logged in
+        if (currentUser) {
+          const matched = state.voters.find((v) => v.email.toLowerCase() === currentUser.email.toLowerCase());
+          if (matched && matched.has_voted !== currentUser.hasVoted) {
+            setCurrentUser((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    hasVoted: Boolean(matched.has_voted),
+                    receiptCode: matched.receipt_code || prev.receiptCode,
+                    votedAt: matched.voted_at || prev.votedAt,
+                  }
+                : null
+            );
+          }
+        }
+      }
+
+      // 5. Ballots
+      if (state.ballots) {
+        const formattedVotes = state.ballots.map(formatDbBallot);
+        setVotes(formattedVotes);
+      }
+
+      setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } catch (err: any) {
+      console.warn('Database fetch warning (strict DB mode):', err);
+      setDbError(err.message || 'Unable to connect to Supabase database.');
+    } finally {
+      setIsLoadingDb(false);
     }
-    return true; // ON by default for testing
-  });
+  }, [currentUser, formatDbBallot]);
 
-  // 6. Election Phase
-  const [electionPhase, setElectionPhase] = useState<'pre-election' | 'polling-live' | 'counting' | 'results-declared'>(() => {
-    try {
-      const saved = localStorage.getItem(PHASE_STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return 'polling-live';
-  });
+  // Initial load
+  useEffect(() => {
+    refreshDbState();
+  }, [refreshDbState]);
 
-  // 7. Announcement Banner
-  const [announcementBanner, setAnnouncementBanner] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem(BANNER_STORAGE_KEY);
-      if (saved !== null) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return 'Official Notice: General Polling stations close at 17:00 EAT. Late queues are constitutionally protected under Article 41(4).';
-  });
+  // Supabase Realtime Subscription
+  useEffect(() => {
+    const unsubscribe = subscribeToElectionRealtime({
+      onBallotInserted: (newBallot) => {
+        const formatted = formatDbBallot(newBallot);
+        setVotes((prev) => {
+          if (prev.some((v) => v.receiptCode === formatted.receiptCode)) return prev;
+          return [formatted, ...prev];
+        });
+        setLastCastVote(formatted);
+      },
+      onSettingsUpdated: (updatedSettings) => {
+        if (typeof updatedSettings.is_results_live === 'boolean') {
+          setIsResultsLiveState(updatedSettings.is_results_live);
+        }
+        if (updatedSettings.election_phase) {
+          setElectionPhaseState(updatedSettings.election_phase);
+        }
+        if (updatedSettings.announcement_banner) {
+          setAnnouncementBannerState(updatedSettings.announcement_banner);
+        }
+      },
+      onCandidateUpdated: (updatedCandidate) => {
+        setDbCandidates((prev) =>
+          prev.map((c) => (c.id === updatedCandidate.id ? { ...c, ...updatedCandidate } : c))
+        );
+        if (updatedCandidate.clearance_status) {
+          setCandidateClearances((prev) => ({
+            ...prev,
+            [updatedCandidate.id]: {
+              status: updatedCandidate.clearance_status,
+              notes: updatedCandidate.clearance_notes || prev[updatedCandidate.id]?.notes || '',
+              updatedAt: 'Just now',
+            },
+          }));
+        }
+      },
+      onVoterUpdated: (updatedVoter) => {
+        setAccreditationList((prev) =>
+          prev.map((v) =>
+            v.email.toLowerCase() === updatedVoter.email.toLowerCase()
+              ? {
+                  ...v,
+                  status: updatedVoter.accreditation_status || v.status,
+                  hasVoted: Boolean(updatedVoter.has_voted),
+                }
+              : v
+          )
+        );
 
-  // 8. Candidate Clearance Registry
-  const [candidateClearances, setCandidateClearances] = useState<Record<string, CandidateClearanceRecord>>(() => {
-    try {
-      const saved = localStorage.getItem(CLEARANCE_STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_CLEARANCES;
-  });
+        if (currentUser && currentUser.email.toLowerCase() === updatedVoter.email.toLowerCase()) {
+          setCurrentUser((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  hasVoted: Boolean(updatedVoter.has_voted),
+                  receiptCode: updatedVoter.receipt_code || prev.receiptCode,
+                  votedAt: updatedVoter.voted_at || prev.votedAt,
+                }
+              : null
+          );
+        }
+      },
+      onStatusChange: (status: ConnectionStatus) => {
+        setIsRealtimeConnected(status === 'connected');
+      },
+    });
 
-  // 9. Voter Roll & Accreditation
-  const [accreditationList, setAccreditationList] = useState<StudentAccreditationRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem(ACCREDITATION_STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return generateInitialAccreditation();
-  });
+    return () => {
+      unsubscribe();
+    };
+  }, [currentUser, formatDbBallot]);
 
-  const [lastCastVote, setLastCastVote] = useState<CastVote | null>(null);
-  const totalRegistered = 384;
-
-  // Persist states
+  // Persist session & user list
   useEffect(() => {
     try {
       localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
@@ -332,143 +402,143 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   useEffect(() => {
     try {
-      localStorage.setItem(VOTES_STORAGE_KEY, JSON.stringify(votes));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [votes]);
-
-  useEffect(() => {
-    try {
       localStorage.setItem(EMAILS_STORAGE_KEY, JSON.stringify(simulatedEmails));
     } catch (e) {
       console.error(e);
     }
   }, [simulatedEmails]);
 
-  useEffect(() => {
+  // Seed database action for commissioners
+  const seedOfficialRoster = async () => {
+    setIsLoadingDb(true);
     try {
-      localStorage.setItem(RESULTS_LIVE_KEY, JSON.stringify(isResultsLive));
-    } catch (e) {
-      console.error(e);
+      const result = await seedElectionDatabaseApi();
+      await refreshDbState();
+      return result;
+    } finally {
+      setIsLoadingDb(false);
     }
-  }, [isResultsLive]);
+  };
 
-  useEffect(() => {
+  // Reset all ballots action
+  const resetAllBallots = async () => {
+    setIsLoadingDb(true);
     try {
-      localStorage.setItem(PHASE_STORAGE_KEY, JSON.stringify(electionPhase));
-    } catch (e) {
-      console.error(e);
+      await resetAllBallotsApi({});
+      setVotes([]);
+      setLastCastVote(null);
+      if (currentUser) {
+        setCurrentUser((prev) => (prev ? { ...prev, hasVoted: false, receiptCode: undefined, votedAt: undefined } : null));
+      }
+      setAccreditationList((prev) => prev.map((s) => ({ ...s, hasVoted: false })));
+    } finally {
+      setIsLoadingDb(false);
     }
-  }, [electionPhase]);
+  };
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(BANNER_STORAGE_KEY, JSON.stringify(announcementBanner));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [announcementBanner]);
+  // Setter wrapper for Results Live (syncs to Supabase)
+  const setIsResultsLive = (val: boolean) => {
+    setIsResultsLiveState(val);
+    updateElectionSettingsApi({ isResultsLive: val }).catch(console.error);
+  };
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(CLEARANCE_STORAGE_KEY, JSON.stringify(candidateClearances));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [candidateClearances]);
+  // Setter wrapper for Election Phase (syncs to Supabase)
+  const setElectionPhase = (phase: 'pre-election' | 'polling-live' | 'counting' | 'results-declared') => {
+    setElectionPhaseState(phase);
+    updateElectionSettingsApi({ electionPhase: phase }).catch(console.error);
+  };
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(ACCREDITATION_STORAGE_KEY, JSON.stringify(accreditationList));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [accreditationList]);
+  // Setter wrapper for Announcement Banner (syncs to Supabase)
+  const setAnnouncementBanner = (text: string) => {
+    setAnnouncementBannerState(text);
+    updateElectionSettingsApi({ announcementBanner: text }).catch(console.error);
+  };
 
-  // Update candidate status
+  // Candidate clearance & profile update (syncs to Supabase)
   const updateCandidateClearance = (
     candidateId: string,
     status: 'Cleared & Certified' | 'Under Review' | 'Provisional',
-    notes: string
+    notes: string,
+    extra?: {
+      name?: string;
+      photoUrl?: string;
+      manifestoSummary?: string;
+    }
   ) => {
-    const now = new Date();
-    const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')} EAT`;
     setCandidateClearances((prev) => ({
       ...prev,
       [candidateId]: {
         status,
         notes,
-        updatedAt: `Today, ${timeStr}`,
+        updatedAt: 'Just now',
       },
     }));
-  };
 
-  // Toggle accreditation status of student
-  const toggleAccreditation = (regNo: string) => {
-    setAccreditationList((prev) =>
-      prev.map((s) => {
-        if (s.regNo === regNo) {
-          const nextStatus = s.status === 'Eligible' ? 'Action Required' : 'Eligible';
-          return {
-            ...s,
-            status: nextStatus,
-            reason: nextStatus === 'Eligible' ? 'Manually accredited by Commission Officer.' : 'Under review by Commission Secretariat.',
-          };
-        }
-        return s;
-      })
-    );
-  };
-
-  // Reset a voter's vote status for testing
-  const resetUserVoteStatus = (email: string) => {
-    const clean = email.toLowerCase().trim();
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.email.toLowerCase() === clean) {
-          return {
-            ...u,
-            hasVoted: false,
-            votedAt: undefined,
-            receiptCode: undefined,
-          };
-        }
-        return u;
-      })
-    );
-
-    if (currentUser && currentUser.email.toLowerCase() === clean) {
-      setCurrentUser((prev: any) =>
-        prev
-          ? {
-              ...prev,
-              hasVoted: false,
-              votedAt: undefined,
-              receiptCode: undefined,
-            }
-          : null
+    if (extra) {
+      setDbCandidates((prev) =>
+        prev.map((c) =>
+          c.id === candidateId
+            ? {
+                ...c,
+                clearance_status: status,
+                clearance_notes: notes,
+                name: extra.name || c.name,
+                photo_url: extra.photoUrl !== undefined ? extra.photoUrl : c.photo_url,
+                manifesto_summary: extra.manifestoSummary || c.manifesto_summary,
+              }
+            : c
+        )
       );
     }
 
+    updateCandidateClearanceApi({
+      candidateId,
+      status,
+      notes,
+      name: extra?.name,
+      photoUrl: extra?.photoUrl,
+      manifestoSummary: extra?.manifestoSummary,
+    }).catch(console.error);
+  };
+
+  // Toggle accreditation (syncs to Supabase)
+  const toggleAccreditation = (regNo: string) => {
+    const student = accreditationList.find((s) => s.regNo === regNo);
+    const nextStatus = student?.status === 'Eligible' ? 'Action Required' : 'Eligible';
+
     setAccreditationList((prev) =>
-      prev.map((s) => {
-        if (s.email.toLowerCase() === clean) {
-          return { ...s, hasVoted: false };
-        }
-        return s;
-      })
+      prev.map((s) => (s.regNo === regNo ? { ...s, status: nextStatus } : s))
     );
+
+    updateVoterAccreditationApi({
+      regNo,
+      status: nextStatus,
+    }).catch(console.error);
   };
 
-  // Reset votes to seed
-  const resetVotesToSeed = () => {
-    const seed = generateInitialVotes();
-    setVotes(seed);
+  // Reset user vote status (syncs to Supabase)
+  const resetUserVoteStatus = (email: string) => {
+    const clean = email.toLowerCase().trim();
+    setUsers((prev) =>
+      prev.map((u) => (u.email.toLowerCase() === clean ? { ...u, hasVoted: false, votedAt: undefined, receiptCode: undefined } : u))
+    );
+
+    if (currentUser && currentUser.email.toLowerCase() === clean) {
+      setCurrentUser((prev) => (prev ? { ...prev, hasVoted: false, votedAt: undefined, receiptCode: undefined } : null));
+    }
+
+    setAccreditationList((prev) =>
+      prev.map((s) => (s.email.toLowerCase() === clean ? { ...s, hasVoted: false } : s))
+    );
+
+    updateVoterAccreditationApi({
+      email: clean,
+      resetVote: true,
+    }).catch(console.error);
   };
 
-  // Sign up action
-  const signUp = (name: string, email: string, yearOfStudy: string) => {
+  // Sign up
+  const signUp = async (name: string, email: string, yearOfStudy: string) => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = name.trim();
 
@@ -478,14 +548,6 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     if (!cleanName) {
       return { success: false, error: 'Full name is required' };
-    }
-
-    const existing = users.find((u) => u.email.toLowerCase() === cleanEmail);
-    if (existing) {
-      return {
-        success: false,
-        error: 'An account with this Kabarak email already exists. Please log in directly.',
-      };
     }
 
     const randomDigits = Math.floor(1000 + Math.random() * 9000);
@@ -508,27 +570,21 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
       sentAt: 'Just now',
     };
 
-    setUsers((prev) => [newUser, ...prev]);
+    setUsers((prev) => [newUser, ...prev.filter((u) => u.email.toLowerCase() !== cleanEmail)]);
     setSimulatedEmails((prev) => [newEmail, ...prev]);
 
-    // Also add to accreditation list if not present
-    setAccreditationList((prev) => {
-      if (!prev.some((s) => s.email.toLowerCase() === cleanEmail)) {
-        return [
-          {
-            regNo: `PHARM/2026/${Math.floor(1000 + Math.random() * 9000)}`,
-            name: cleanName,
-            email: cleanEmail,
-            yearOfStudy,
-            status: 'Eligible',
-            reason: 'Registered via student auth portal.',
-            hasVoted: false,
-          },
-          ...prev,
-        ];
-      }
-      return prev;
-    });
+    // Register in Supabase database
+    try {
+      await registerVoterApi({
+        name: cleanName,
+        email: cleanEmail,
+        yearOfStudy,
+      });
+      // Refresh voter roll
+      refreshDbState();
+    } catch (e) {
+      console.warn('DB registration notice:', e);
+    }
 
     return {
       success: true,
@@ -537,7 +593,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
   };
 
-  // Login action
+  // Login
   const login = (email: string, password: string) => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanPass = password.trim();
@@ -565,56 +621,45 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
   };
 
-  // Logout action
+  // Logout
   const logout = () => {
     setCurrentUser(null);
   };
 
-  // Cast vote action
+  // Cast Anonymized Secret Ballot (Constitutional dual-write into Supabase)
   const castVote = async (choices: Record<string, string>): Promise<{ success: boolean; receiptCode: string; timestamp: string }> => {
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    const fullTimeStr = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} EAT`;
-    const receiptCode = `KUPSA-2026-REC-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-
-    const newCastVote: CastVote = {
-      id: `vote-${Date.now()}`,
-      timestamp: timeStr,
-      fullTimestamp: fullTimeStr,
-      choices,
-      voterYear: currentUser?.yearOfStudy || 'Year 3',
-      receiptCode,
-    };
-
-    setVotes((prev) => [newCastVote, ...prev]);
-    setLastCastVote(newCastVote);
-
-    if (currentUser) {
-      const updatedUser: VoterUser = {
-        ...currentUser,
-        hasVoted: true,
-        votedAt: fullTimeStr,
-        receiptCode,
-      };
-
-      setCurrentUser(updatedUser);
-      setUsers((prev) => prev.map((u) => (u.email === updatedUser.email ? updatedUser : u)));
-
-      setAccreditationList((prev) =>
-        prev.map((s) => (s.email.toLowerCase() === updatedUser.email.toLowerCase() ? { ...s, hasVoted: true } : s))
-      );
+    if (!currentUser) {
+      throw new Error('Voter authentication session required.');
     }
 
-    return {
-      success: true,
-      receiptCode,
-      timestamp: fullTimeStr,
+    // Call server to write anonymized ballot into DB and mark voter completed
+    const result = await castSecretBallotApi({
+      email: currentUser.email,
+      voterYear: currentUser.yearOfStudy || 'Year 3',
+      choices,
+    });
+
+    const updatedUser: VoterUser = {
+      ...currentUser,
+      hasVoted: true,
+      votedAt: result.timestamp,
+      receiptCode: result.receiptCode,
     };
+
+    setCurrentUser(updatedUser);
+    setUsers((prev) => prev.map((u) => (u.email.toLowerCase() === updatedUser.email.toLowerCase() ? updatedUser : u)));
+
+    setAccreditationList((prev) =>
+      prev.map((s) => (s.email.toLowerCase() === updatedUser.email.toLowerCase() ? { ...s, hasVoted: true } : s))
+    );
+
+    // Refresh state to ensure clean sync
+    refreshDbState();
+
+    return result;
   };
 
-  // Simulate incoming vote for live dashboard demo
+  // Simulate incoming vote for live dashboard demo / rehearsal
   const simulateIncomingVote = (): CastVote => {
     const years = ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'];
     const now = new Date();
@@ -631,18 +676,32 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
       'academic-sec': 'abstain',
     };
 
+    const simReceipt = `KUPSA-2026-REC-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+    // Also push to DB if possible
+    castSecretBallotApi({
+      email: `simulated.student.${Date.now()}@kabarak.ac.ke`,
+      voterYear: randomYear,
+      choices: simChoices,
+    }).catch(console.warn);
+
     const simVote: CastVote = {
       id: `sim-vote-${Date.now()}`,
       timestamp: timeStr,
       fullTimestamp: fullTimeStr,
       choices: simChoices,
       voterYear: randomYear,
-      receiptCode: `KUPSA-2026-REC-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
+      receiptCode: simReceipt,
     };
 
     setVotes((prev) => [simVote, ...prev]);
     setLastCastVote(simVote);
     return simVote;
+  };
+
+  // Legacy reset votes for testing
+  const resetVotesToSeed = () => {
+    resetAllBallots();
   };
 
   const getSimulatedEmail = (email: string) => {
@@ -666,6 +725,10 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return true;
   };
 
+  const totalRegistered = useMemo(() => {
+    return Math.max(accreditationList.length, 384);
+  }, [accreditationList]);
+
   return (
     <VotingStoreContext.Provider
       value={{
@@ -675,6 +738,15 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
         simulatedEmails,
         lastCastVote,
         totalRegistered,
+        isLoadingDb,
+        dbError,
+        isRealtimeConnected,
+        lastSyncTime,
+        refreshDbState,
+        seedOfficialRoster,
+        resetAllBallots,
+        dbOffices,
+        dbCandidates,
         isResultsLive,
         setIsResultsLive,
         electionPhase,

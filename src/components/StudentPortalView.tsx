@@ -16,11 +16,14 @@ import {
   Check
 } from 'lucide-react';
 
+import { useVotingStore } from '../context/VotingStore';
+
 interface StudentPortalViewProps {
   onNavigate: (view: ViewId) => void;
 }
 
 export function StudentPortalView({ onNavigate }: StudentPortalViewProps) {
+  const { accreditationList } = useVotingStore();
   const [regNo, setRegNo] = useState('');
   const [result, setResult] = useState<StudentRecord | null | undefined>(undefined);
 
@@ -46,6 +49,25 @@ export function StudentPortalView({ onNavigate }: StudentPortalViewProps) {
   const checkEligibility = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const cleanReg = regNo.trim().toUpperCase();
+
+    // Check live database accreditation roster first
+    const inDb = accreditationList.find(
+      (s) => s.regNo.toUpperCase() === cleanReg || s.email.toUpperCase() === cleanReg
+    );
+    if (inDb) {
+      setResult({
+        regNo: inDb.regNo,
+        name: inDb.name,
+        email: inDb.email,
+        yearOfStudy: inDb.yearOfStudy,
+        status: inDb.status,
+        reason: inDb.reason,
+        duesCleared: inDb.status === 'Eligible',
+        academicGoodStanding: true,
+      });
+      return;
+    }
+
     const found = SAMPLE_STUDENTS.find(
       (s) => s.regNo.toUpperCase() === cleanReg
     );
@@ -54,6 +76,23 @@ export function StudentPortalView({ onNavigate }: StudentPortalViewProps) {
 
   const handleQuickSelect = (reg: string) => {
     setRegNo(reg);
+    const cleanReg = reg.trim().toUpperCase();
+    const inDb = accreditationList.find(
+      (s) => s.regNo.toUpperCase() === cleanReg || s.email.toUpperCase() === cleanReg
+    );
+    if (inDb) {
+      setResult({
+        regNo: inDb.regNo,
+        name: inDb.name,
+        email: inDb.email,
+        yearOfStudy: inDb.yearOfStudy,
+        status: inDb.status,
+        reason: inDb.reason,
+        duesCleared: inDb.status === 'Eligible',
+        academicGoodStanding: true,
+      });
+      return;
+    }
     const found = SAMPLE_STUDENTS.find((s) => s.regNo.toUpperCase() === reg.toUpperCase());
     setResult(found ?? null);
   };
