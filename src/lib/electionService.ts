@@ -281,7 +281,7 @@ export async function registerVoterApi(payload: {
   name: string;
   email: string;
   yearOfStudy: string;
-}): Promise<{ success: boolean; voter: DbVoter; alreadyExists: boolean; password?: string }> {
+}): Promise<{ success: boolean; voter: DbVoter; alreadyExists: boolean }> {
   const response = await fetch('/api/voter/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -291,45 +291,6 @@ export async function registerVoterApi(payload: {
   const data = await response.json();
   if (!response.ok) {
     throw new Error(data.error || 'Failed to register student voter.');
-  }
-  return data;
-}
-
-/**
- * Log in a voter using university email and specific access PIN
- */
-export async function loginVoterApi(payload: {
-  email: string;
-  password: string;
-}): Promise<{ success: boolean; voter: any; error?: string }> {
-  const response = await fetch('/api/voter/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to authenticate voter credentials.');
-  }
-  return data;
-}
-
-/**
- * Request resend of voter access PIN to university email
- */
-export async function resendVoterPinApi(payload: {
-  email: string;
-}): Promise<{ success: boolean; message: string; password?: string }> {
-  const response = await fetch('/api/voter/resend-pin', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to resend voter PIN.');
   }
   return data;
 }
