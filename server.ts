@@ -5,6 +5,9 @@ import dotenv from 'dotenv';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createServer as createViteServer } from 'vite';
 
+import { NotificationOutbox } from './src/server/notification-outbox.js';
+import { verifySmtpConnection, resolveSmtpCredentials } from './src/server/email.server.js';
+
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -29,6 +32,21 @@ const supabaseAdmin: SupabaseClient | null =
         auth: { persistSession: false, autoRefreshToken: false },
       })
     : null;
+
+// Initialize Notification Outbox with Supabase client (with direct fallback if table is not yet created)
+NotificationOutbox.init(supabaseAdmin);
+
+// Background retry processor for notification outbox (every 60 seconds)
+setInterval(async () => {
+  try {
+    const processed = await NotificationOutbox.processDue(25);
+    if (processed > 0) {
+      console.log(`[NotificationOutbox Worker] Processed ${processed} due outbox notification(s).`);
+    }
+  } catch (err: any) {
+    console.error('[NotificationOutbox Worker Error]', err);
+  }
+}, 60000);
 
 // Initial Seed data for KUPSA
 const INITIAL_OFFICES = [
@@ -519,7 +537,7 @@ app.post('/api/election/settings', async (req: Request, res: Response) => {
         ...updatePayload,
         is_results_live: updatePayload.is_results_live ?? true,
         election_phase: updatePayload.election_phase ?? 'polling-live',
-        announcement_banner: updatePayload.announcement_banner ?? 'General Polling Live.',
+        announcement_banner: updatePayload.announcement_banner ?? '',
       });
     }
 
@@ -660,11 +678,13 @@ app.post('/api/voter/signup', async (req: Request, res: Response) => {
       });
     }
 
+    const generatedPasscode = `KUP-${Math.floor(1000 + Math.random() * 9000)}`;
+
     // Ensure Auth user exists
     let authUserId: string | null = null;
     const { data: authUser, error: authErr } = await supabaseAdmin.auth.admin.createUser({
       email: cleanEmail,
-      password: `KUP-${Math.floor(1000 + Math.random() * 9000)}`,
+      password: generatedPasscode,
       email_confirm: true,
       user_metadata: { full_name: cleanName, year_of_study: yearOfStudy || 'Year 3' },
     });
@@ -699,6 +719,28 @@ app.post('/api/voter/signup', async (req: Request, res: Response) => {
     if (error) {
       return res.status(500).json({ error: error.message });
     }
+
+    // Autonomously enqueue and dispatch official voter passcard email with PDF, QR code, and calendar invite
+    const portalUrl = (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).trim();
+    NotificationOutbox.enqueueAndDispatch(
+      {
+        channel: 'email',
+        type: 'voter_pass',
+        recipient: cleanEmail,
+        payload: {
+          to: cleanEmail,
+          studentName: cleanName,
+          regNo,
+          yearOfStudy: yearOfStudy || 'Year 3',
+          passwordCode: generatedPasscode,
+          pollingStation: 'School of Pharmacy Complex, Kabarak University',
+          portalUrl,
+        },
+      },
+      `voter-pass:${regNo}`
+    ).catch((dispatchErr) => {
+      console.warn('[Signup Email Dispatch Notice]', dispatchErr);
+    });
 
     return res.json({
       success: true,
@@ -749,6 +791,132 @@ app.post('/api/election/reset-votes', async (req: Request, res: Response) => {
 function balloutDeleteError(err: any): boolean {
   return Boolean(err && err.code !== 'PGRST116');
 }
+
+// ==========================================
+// KUPSA RESILIENT EMAIL OUTBOX DISPATCH APIS
+// ==========================================
+
+// Diagnostic SMTP status check
+app.get('/api/email/status', async (_req: Request, res: Response) => {
+  const status = NotificationOutbox.getSmtpStatus();
+  return res.json({
+    ...status,
+    hasPassword: Boolean(process.env.SMTP_PASS?.trim()),
+    from: process.env.EMAIL_FROM || null,
+  });
+});
+
+// Verify live SMTP handshake with Gmail
+app.post('/api/email/test-smtp', async (req: Request, res: Response) => {
+  const result = await verifySmtpConnection();
+  return res.json(result);
+});
+
+// Enqueue and dispatch official Voter Polling Pass
+app.post('/api/email/voter-pass', async (req: Request, res: Response) => {
+  const { studentName, regNo, yearOfStudy, email, passwordCode, pollingStation } = req.body;
+  const recipient = (email || '').trim().toLowerCase();
+
+  if (!recipient || !regNo) {
+    return res.status(400).json({ error: 'recipient email and regNo are required' });
+  }
+
+  const portalUrl = (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).trim();
+  const dispatchResult = await NotificationOutbox.enqueueAndDispatch(
+    {
+      channel: 'email',
+      type: 'voter_pass',
+      recipient,
+      payload: {
+        to: recipient,
+        studentName: studentName || 'Kabarak Pharmacy Scholar',
+        regNo,
+        yearOfStudy: yearOfStudy || 'Year 3',
+        passwordCode: passwordCode || 'KUP-2026',
+        pollingStation: pollingStation || 'School of Pharmacy Complex, Kabarak University',
+        portalUrl,
+      },
+    },
+    `voter-pass:${regNo}:${Date.now()}`
+  );
+
+  return res.json(dispatchResult);
+});
+
+// Enqueue and dispatch Certified Results Gazettement
+app.post('/api/email/results-broadcast', async (req: Request, res: Response) => {
+  const { recipientEmail, recipientName, declarationStatement, officesSummary, totalVotes, totalRegistered, turnoutPct } = req.body;
+  const recipient = (recipientEmail || '').trim().toLowerCase();
+
+  if (!recipient) {
+    return res.status(400).json({ error: 'recipientEmail is required' });
+  }
+
+  const portalUrl = (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).trim();
+  const gazettedTimestamp = new Date().toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' }) + ' EAT';
+
+  const dispatchResult = await NotificationOutbox.enqueueAndDispatch(
+    {
+      channel: 'email',
+      type: 'results_broadcast',
+      recipient,
+      payload: {
+        to: recipient,
+        recipientName: recipientName || 'Kabarak University Pharmacy Scholar',
+        declarationStatement: declarationStatement || 'Certified official results declared under constitutional authority.',
+        officesSummary: officesSummary || [],
+        totalVotes: totalVotes || 0,
+        totalRegistered: totalRegistered || 1000,
+        turnoutPct: turnoutPct || 0,
+        gazettedTimestamp,
+        portalUrl,
+      },
+    },
+    `results-gazette:${recipient}:${Date.now()}`
+  );
+
+  return res.json(dispatchResult);
+});
+
+// Enqueue and dispatch Commission Gazette Notice
+app.post('/api/email/commission-notice', async (req: Request, res: Response) => {
+  const { recipientEmail, headline, bodyText, urgency, issuedBy } = req.body;
+  const recipient = (recipientEmail || '').trim().toLowerCase();
+
+  if (!recipient || !headline || !bodyText) {
+    return res.status(400).json({ error: 'recipientEmail, headline, and bodyText are required' });
+  }
+
+  const portalUrl = (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).trim();
+  const dispatchResult = await NotificationOutbox.enqueueAndDispatch(
+    {
+      channel: 'email',
+      type: 'commission_notice',
+      recipient,
+      payload: {
+        to: recipient,
+        headline,
+        bodyText,
+        urgency: urgency || 'urgent',
+        issuedBy: issuedBy || 'KUPSA Independent Electoral Commission',
+        portalUrl,
+      },
+    },
+    `commission-notice:${recipient}:${Date.now()}`
+  );
+
+  return res.json(dispatchResult);
+});
+
+// Cron / worker endpoint to process due outbox items
+app.all(['/api/cron/process-outbox', '/api/cron/retry-outbox'], async (_req: Request, res: Response) => {
+  const processed = await NotificationOutbox.processDue(25);
+  return res.json({
+    success: true,
+    processed,
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // Development Vite Middleware or Production Static Serving
 async function startServer() {

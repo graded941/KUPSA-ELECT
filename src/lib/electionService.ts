@@ -78,11 +78,37 @@ export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'er
  * Fetch complete live election state from server / database
  */
 export async function fetchLiveElectionState(): Promise<ElectionFullState> {
-  const response = await fetch('/api/election/state');
-  if (!response.ok) {
-    throw new Error(`Failed to fetch election state: ${response.statusText}`);
+  try {
+    const response = await fetch('/api/election/state');
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err) {
+    console.warn('API /api/election/state unavailable, attempting direct Supabase query:', err);
   }
-  return await response.json();
+
+  // Direct Supabase Client fallback (for Vercel static deployments)
+  if (supabase) {
+    const [settingsRes, officesRes, candidatesRes, votersRes, ballotsRes, auditRes] = await Promise.all([
+      supabase.from('election_settings').select('*').limit(1).maybeSingle(),
+      supabase.from('offices').select('*').order('display_order', { ascending: true }),
+      supabase.from('candidates').select('*'),
+      supabase.from('voters').select('*'),
+      supabase.from('ballots').select('*'),
+      supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(50),
+    ]);
+
+    return {
+      settings: settingsRes.data || null,
+      offices: officesRes.data || [],
+      candidates: candidatesRes.data || [],
+      voters: votersRes.data || [],
+      ballots: ballotsRes.data || [],
+      auditLogs: auditRes.data || [],
+    };
+  }
+
+  throw new Error('Neither API server nor Supabase client is available');
 }
 
 /**
@@ -93,17 +119,45 @@ export async function castSecretBallotApi(payload: {
   voterYear: string;
   choices: Record<string, string>;
 }): Promise<{ success: boolean; receiptCode: string; timestamp: string }> {
-  const response = await fetch('/api/ballot/cast', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetch('/api/ballot/cast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to seal ballot.');
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err) {
+    console.warn('API /api/ballot/cast error, attempting direct Supabase client fallback:', err);
   }
-  return data;
+
+  if (supabase) {
+    const receiptCode = 'KUP-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+    const ballotId = crypto.randomUUID();
+    const nowIso = new Date().toISOString();
+
+    const { error: ballotError } = await supabase.from('ballots').insert({
+      id: ballotId,
+      receipt_code: receiptCode,
+      voter_year: payload.voterYear,
+      choices: payload.choices,
+      created_at: nowIso,
+    });
+
+    if (ballotError) throw new Error(ballotError.message);
+
+    await supabase.from('voters').update({
+      has_voted: true,
+      voted_at: nowIso,
+      receipt_code: receiptCode,
+    }).ilike('email', payload.email.trim());
+
+    return { success: true, receiptCode, timestamp: nowIso };
+  }
+
+  throw new Error('Failed to seal ballot.');
 }
 
 /**
@@ -137,17 +191,36 @@ export async function updateElectionSettingsApi(payload: {
   officerEmail?: string;
   officerRole?: string;
 }): Promise<{ success: boolean }> {
-  const response = await fetch('/api/election/settings', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetch('/api/election/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to update settings.');
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err) {
+    console.warn('API /api/election/settings error, attempting direct Supabase fallback:', err);
   }
-  return data;
+
+  if (supabase) {
+    const updatePayload: any = { updated_at: new Date().toISOString() };
+    if (typeof payload.isResultsLive === 'boolean') updatePayload.is_results_live = payload.isResultsLive;
+    if (typeof payload.electionPhase === 'string') updatePayload.election_phase = payload.electionPhase;
+    if (typeof payload.announcementBanner === 'string') updatePayload.announcement_banner = payload.announcementBanner;
+
+    const { data: existing } = await supabase.from('election_settings').select('id').limit(1).maybeSingle();
+    if (existing) {
+      await supabase.from('election_settings').update(updatePayload).eq('id', existing.id);
+    } else {
+      await supabase.from('election_settings').insert(updatePayload);
+    }
+    return { success: true };
+  }
+
+  throw new Error('Failed to update settings.');
 }
 
 /**
@@ -313,3 +386,105 @@ export function subscribeToElectionRealtime(callbacks: {
     }
   };
 }
+
+// ==========================================
+// CLIENT EMAIL API FUNCTIONS
+// ==========================================
+
+export async function fetchSmtpStatus(): Promise<{
+  configured: boolean;
+  user?: string;
+  host?: string;
+  port?: number;
+  hasPassword?: boolean;
+  from?: string;
+}> {
+  try {
+    const res = await fetch('/api/email/status');
+    if (!res.ok) throw new Error('Failed to fetch SMTP status');
+    return await res.json();
+  } catch (err: any) {
+    return { configured: false };
+  }
+}
+
+export async function triggerTestSmtp(): Promise<{
+  success: boolean;
+  message: string;
+  user?: string;
+  host?: string;
+  port?: number;
+}> {
+  try {
+    const res = await fetch('/api/email/test-smtp', { method: 'POST' });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, message: err.message || 'SMTP test failed' };
+  }
+}
+
+export async function dispatchVoterPassEmail(payload: {
+  studentName: string;
+  regNo: string;
+  yearOfStudy: string;
+  email: string;
+  passwordCode: string;
+  pollingStation?: string;
+}): Promise<{ success: boolean; outboxId?: string; messageId?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/email/voter-pass', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function dispatchResultsGazetteEmail(payload: {
+  recipientEmail: string;
+  recipientName?: string;
+  declarationStatement: string;
+  officesSummary: Array<{
+    officeTitle: string;
+    winnerName: string;
+    winnerVotes: number;
+    winnerPct: number;
+  }>;
+  totalVotes: number;
+  totalRegistered: number;
+  turnoutPct: number;
+}): Promise<{ success: boolean; outboxId?: string; messageId?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/email/results-broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function dispatchNoticeEmail(payload: {
+  recipientEmail: string;
+  headline: string;
+  bodyText: string;
+  urgency?: 'routine' | 'urgent' | 'critical';
+  issuedBy?: string;
+}): Promise<{ success: boolean; outboxId?: string; messageId?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/email/commission-notice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+

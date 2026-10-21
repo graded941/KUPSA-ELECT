@@ -49,6 +49,9 @@ export interface CandidateClearanceRecord {
   status: 'Cleared & Certified' | 'Under Review' | 'Provisional';
   notes: string;
   updatedAt: string;
+  name?: string;
+  photoUrl?: string;
+  manifestoSummary?: string;
 }
 
 export interface StudentAccreditationRecord {
@@ -143,9 +146,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
   // Settings
   const [isResultsLive, setIsResultsLiveState] = useState<boolean>(true);
   const [electionPhase, setElectionPhaseState] = useState<'pre-election' | 'polling-live' | 'counting' | 'results-declared'>('polling-live');
-  const [announcementBanner, setAnnouncementBannerState] = useState<string>(
-    'Official Notice: General Polling in session under Chapter Six statutory authority.'
-  );
+  const [announcementBanner, setAnnouncementBannerState] = useState<string>('');
 
   // Clearances & Accreditation lists
   const [candidateClearances, setCandidateClearances] = useState<Record<string, CandidateClearanceRecord>>({});
@@ -471,6 +472,9 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
         status,
         notes,
         updatedAt: 'Just now',
+        ...(extra?.name ? { name: extra.name } : {}),
+        ...(extra?.photoUrl ? { photoUrl: extra.photoUrl } : {}),
+        ...(extra?.manifestoSummary ? { manifestoSummary: extra.manifestoSummary } : {}),
       },
     }));
 

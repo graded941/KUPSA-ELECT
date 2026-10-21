@@ -1,8 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useGmail } from '../context/GmailContext';
 import { useVotingStore } from '../context/VotingStore';
 import { SHARED_OFFICES, SHARED_CANDIDATES } from '../data/candidateData';
 import { GoogleSignInButton } from './GoogleSignInButton';
+import {
+  fetchSmtpStatus,
+  triggerTestSmtp,
+  dispatchVoterPassEmail,
+  dispatchResultsGazetteEmail,
+  dispatchNoticeEmail,
+} from '../lib/electionService';
 import {
   Mail,
   Send,
@@ -17,7 +24,13 @@ import {
   UserCheck,
   Users,
   X,
-  Check
+  Check,
+  Server,
+  KeyRound,
+  FileText,
+  Calendar,
+  QrCode,
+  Flame,
 } from 'lucide-react';
 
 export function GmailBroadcastPanel() {
@@ -42,7 +55,20 @@ export function GmailBroadcastPanel() {
   } = useVotingStore();
 
   // Active sub-section
-  const [subTab, setSubTab] = useState<'broadcast' | 'passcards'>('broadcast');
+  const [subTab, setSubTab] = useState<'broadcast' | 'passcards' | 'gazette-notice'>('broadcast');
+
+  // SMTP Driver Status
+  const [smtpStatus, setSmtpStatus] = useState<{
+    configured: boolean;
+    user?: string;
+    host?: string;
+    port?: number;
+    hasPassword?: boolean;
+    from?: string;
+  } | null>(null);
+  const [isCheckingSmtp, setIsCheckingSmtp] = useState(false);
+  const [testSmtpResult, setTestSmtpResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [dispatchMode, setDispatchMode] = useState<'smtp' | 'oauth'>('smtp');
 
   // Broadcast settings
   const [targetAudience, setTargetAudience] = useState<'all' | 'custom'>('all');
@@ -51,7 +77,7 @@ export function GmailBroadcastPanel() {
     'Pursuant to Article 45 of the KUPSA Constitution, the Independent Electoral Commission officially declares and gazettes the certified general election outcomes as free, fair, credible, and conclusive.'
   );
 
-  // Confirmation modal state (MANDATORY per Workspace Skill destructive operation rules)
+  // Confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
 
@@ -68,10 +94,52 @@ export function GmailBroadcastPanel() {
   // Passcard single dispatch state
   const [passcardStudentName, setPasscardStudentName] = useState('');
   const [passcardEmail, setPasscardEmail] = useState('');
+  const [passcardRegNo, setPasscardRegNo] = useState('PHARM/2026/0142');
   const [passcardYear, setPasscardYear] = useState('Year 3');
   const [passcardPassword, setPasscardPassword] = useState('KUP-2026');
   const [passcardStatus, setPasscardStatus] = useState<string | null>(null);
   const [isSendingPasscard, setIsSendingPasscard] = useState(false);
+
+  // Commission Notice state
+  const [noticeHeadline, setNoticeHeadline] = useState('Official Polling Station Check-in Directives');
+  const [noticeBody, setNoticeBody] = useState(
+    'All accredited pharmacy scholars are notified that official physical polling desks open at 08:00 EAT at the School of Pharmacy Complex. Online e-balloting remains accessible 24/7 on this portal.'
+  );
+  const [noticeUrgency, setNoticeUrgency] = useState<'routine' | 'urgent' | 'critical'>('urgent');
+  const [noticeRecipient, setNoticeRecipient] = useState('');
+  const [noticeStatus, setNoticeStatus] = useState<string | null>(null);
+  const [isSendingNotice, setIsSendingNotice] = useState(false);
+
+  // Load SMTP status on mount
+  const checkSmtp = async () => {
+    setIsCheckingSmtp(true);
+    try {
+      const status = await fetchSmtpStatus();
+      setSmtpStatus(status);
+    } catch {
+      setSmtpStatus({ configured: false });
+    } finally {
+      setIsCheckingSmtp(false);
+    }
+  };
+
+  useEffect(() => {
+    checkSmtp();
+  }, []);
+
+  const handleTestSmtp = async () => {
+    setIsCheckingSmtp(true);
+    setTestSmtpResult(null);
+    try {
+      const res = await triggerTestSmtp();
+      setTestSmtpResult(res);
+      await checkSmtp();
+    } catch (err: any) {
+      setTestSmtpResult({ success: false, message: err.message || 'SMTP test handshake failed' });
+    } finally {
+      setIsCheckingSmtp(false);
+    }
+  };
 
   // Calculate office winners from current votes
   const officeWinners = useMemo(() => {
@@ -138,41 +206,77 @@ export function GmailBroadcastPanel() {
       current: 0,
       success: 0,
       failed: 0,
-      logs: [`Initiating official broadcast to ${recipientsList.length} recipient(s)...`],
+      logs: [`Initiating official broadcast to ${recipientsList.length} recipient(s) via ${dispatchMode.toUpperCase()} engine...`],
     });
 
     const now = new Date();
     const timestampStr = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} EAT`;
 
     try {
-      const result = await sendBroadcastResults({
-        recipients: recipientsList,
-        declarationStatement,
-        officesSummary: officeWinners,
-        totalVotes: votes.length,
-        totalRegistered,
-        turnoutPct,
-        timestamp: timestampStr,
-      });
+      if (dispatchMode === 'smtp') {
+        // Dispatch using transactional outbox backend endpoint
+        let successCount = 0;
+        let failCount = 0;
+        const newLogs: string[] = [];
 
-      setSendProgress((prev) => ({
-        total: recipientsList.length,
-        current: recipientsList.length,
-        success: result.successCount,
-        failed: result.failureCount,
-        logs: [
-          ...(prev?.logs || []),
-          `Broadcast completed: ${result.successCount} sent, ${result.failureCount} failed.`,
-          ...(result.errors.length > 0 ? [`Errors: ${result.errors.slice(0, 3).join('; ')}`] : []),
-        ],
-      }));
+        for (let i = 0; i < recipientsList.length; i++) {
+          const recEmail = recipientsList[i];
+          const res = await dispatchResultsGazetteEmail({
+            recipientEmail: recEmail,
+            declarationStatement,
+            officesSummary: officeWinners,
+            totalVotes: votes.length,
+            totalRegistered,
+            turnoutPct,
+          });
+
+          if (res.success) {
+            successCount++;
+            newLogs.push(`[${i + 1}/${recipientsList.length}] ✓ Dispatched to ${recEmail} (Outbox ID: ${res.outboxId})`);
+          } else {
+            failCount++;
+            newLogs.push(`[${i + 1}/${recipientsList.length}] ✗ Failed for ${recEmail}: ${res.error}`);
+          }
+
+          setSendProgress({
+            total: recipientsList.length,
+            current: i + 1,
+            success: successCount,
+            failed: failCount,
+            logs: newLogs,
+          });
+        }
+      } else {
+        // OAuth dispatch
+        const result = await sendBroadcastResults({
+          recipients: recipientsList,
+          declarationStatement,
+          officesSummary: officeWinners,
+          totalVotes: votes.length,
+          totalRegistered,
+          turnoutPct,
+          timestamp: timestampStr,
+        });
+
+        setSendProgress((prev) => ({
+          total: recipientsList.length,
+          current: recipientsList.length,
+          success: result.successCount,
+          failed: result.failureCount,
+          logs: [
+            ...(prev?.logs || []),
+            `OAuth broadcast completed: ${result.successCount} sent, ${result.failureCount} failed.`,
+            ...(result.errors.length > 0 ? [`Errors: ${result.errors.slice(0, 3).join('; ')}`] : []),
+          ],
+        }));
+      }
     } catch (err: any) {
       setSendProgress((prev) => ({
         total: recipientsList.length,
         current: prev?.current || 0,
         success: prev?.success || 0,
         failed: recipientsList.length,
-        logs: [...(prev?.logs || []), `Fatal error: ${err.message}`],
+        logs: [...(prev?.logs || []), `Fatal dispatch error: ${err.message}`],
       }));
     } finally {
       setIsSending(false);
@@ -187,30 +291,85 @@ export function GmailBroadcastPanel() {
     setIsSendingPasscard(true);
     setPasscardStatus(null);
 
-    const res = await sendPasswordEmail({
-      studentName: passcardStudentName.trim() || 'Accredited Student',
-      recipientEmail: passcardEmail.trim().toLowerCase(),
-      password: passcardPassword.trim() || 'KUP-2026',
-      yearOfStudy: passcardYear,
-    });
+    try {
+      if (dispatchMode === 'smtp') {
+        const res = await dispatchVoterPassEmail({
+          studentName: passcardStudentName.trim() || 'Accredited Student',
+          email: passcardEmail.trim().toLowerCase(),
+          regNo: passcardRegNo.trim(),
+          yearOfStudy: passcardYear,
+          passwordCode: passcardPassword.trim(),
+          pollingStation: 'School of Pharmacy Complex, Kabarak University',
+        });
 
-    setIsSendingPasscard(false);
-    if (res.success) {
-      setPasscardStatus(`✓ Passcard email successfully sent to ${passcardEmail} (ID: ${res.messageId})`);
-    } else {
-      setPasscardStatus(`✗ Error: ${res.error}`);
+        if (res.success) {
+          setPasscardStatus(
+            `✓ Official Voter Pass (with PDF passcard, QR code, and .ics calendar invite) successfully queued & sent to ${passcardEmail} (Outbox ID: ${res.outboxId})`
+          );
+        } else {
+          setPasscardStatus(`✗ Error: ${res.error}`);
+        }
+      } else {
+        const res = await sendPasswordEmail({
+          studentName: passcardStudentName.trim() || 'Accredited Student',
+          recipientEmail: passcardEmail.trim().toLowerCase(),
+          password: passcardPassword.trim() || 'KUP-2026',
+          yearOfStudy: passcardYear,
+        });
+
+        if (res.success) {
+          setPasscardStatus(`✓ Passcard email successfully sent to ${passcardEmail} via Gmail OAuth (ID: ${res.messageId})`);
+        } else {
+          setPasscardStatus(`✗ Error: ${res.error}`);
+        }
+      }
+    } catch (err: any) {
+      setPasscardStatus(`✗ Unexpected error: ${err.message}`);
+    } finally {
+      setIsSendingPasscard(false);
     }
   };
 
+  // Commission Notice dispatch
+  const handleSendNotice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const recipient = noticeRecipient.trim() || customEmail.trim() || (recipientsList[0] || 'verve.n.co.ke@gmail.com');
+    setIsSendingNotice(true);
+    setNoticeStatus(null);
+
+    try {
+      const res = await dispatchNoticeEmail({
+        recipientEmail: recipient,
+        headline: noticeHeadline,
+        bodyText: noticeBody,
+        urgency: noticeUrgency,
+        issuedBy: 'KUPSA Independent Electoral Commission',
+      });
+
+      if (res.success) {
+        setNoticeStatus(`✓ Gazette Notice queued and dispatched to ${recipient} (Outbox ID: ${res.outboxId})`);
+      } else {
+        setNoticeStatus(`✗ Failed to dispatch notice: ${res.error}`);
+      }
+    } catch (err: any) {
+      setNoticeStatus(`✗ Error: ${err.message}`);
+    } finally {
+      setIsSendingNotice(false);
+    }
+  };
+
+  const isSmtpReady = Boolean(smtpStatus?.configured && smtpStatus?.hasPassword);
+  const canSend = (dispatchMode === 'smtp' && isSmtpReady) || (dispatchMode === 'oauth' && isGmailConnected);
+
   return (
     <div className="space-y-6">
-      {/* Commission Gmail Connection Bar */}
-      <div className="rounded-2xl border-2 border-ink bg-card p-5 sm:p-6 shadow-sm">
+      {/* Dual Engine Controller Bar */}
+      <div className="rounded-2xl border-2 border-ink bg-card p-5 sm:p-6 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-ink border-2 border-sun text-white shrink-0">
               <Mail className="h-6 w-6 text-sun" />
-              {isGmailConnected && (
+              {(isSmtpReady || isGmailConnected) && (
                 <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 border-2 border-card">
                   <Check className="h-2.5 w-2.5 text-white" />
                 </span>
@@ -220,65 +379,132 @@ export function GmailBroadcastPanel() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
-                  Google Workspace Integration
+                  Autonomous Email Dispatch System
                 </span>
                 <span
                   className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                    isGmailConnected
+                    isSmtpReady
                       ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/30'
                       : 'bg-amber-500/10 text-amber-800 border border-amber-500/30'
                   }`}
                 >
-                  {isGmailConnected ? 'GMAIL CONNECTED' : 'NOT CONNECTED'}
+                  {isSmtpReady ? 'SMTP DRIVER READY' : 'SMTP PASS NEEDED'}
                 </span>
               </div>
               <h2 className="font-display text-lg font-bold text-foreground">
-                Official Commission Gmail Dispatcher
+                Official Commission Dispatch Engine
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Authorizes direct automated dispatch of voter password credentials and gazetted election outcomes.
+                Transactional Outbox pattern with Nodemailer SSL driver (Port 465) and Google Workspace OAuth failover.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {isGmailConnected ? (
-              <div className="flex items-center gap-3 bg-secondary/80 p-2 rounded-xl border border-border">
-                {googleUser?.photoURL && (
-                  <img
-                    src={googleUser.photoURL}
-                    alt={googleUser.displayName || 'Google User'}
-                    className="h-8 w-8 rounded-full border border-border"
-                  />
-                )}
-                <div className="text-left pr-2">
-                  <div className="text-xs font-bold text-foreground truncate max-w-[180px]">
-                    {googleUser?.email}
-                  </div>
-                  <div className="text-[10px] text-emerald-600 font-medium">Ready to dispatch emails</div>
-                </div>
+          {/* Engine Selector */}
+          <div className="flex items-center gap-2 bg-secondary p-1 rounded-xl border border-border">
+            <button
+              type="button"
+              onClick={() => setDispatchMode('smtp')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
+                dispatchMode === 'smtp'
+                  ? 'bg-ink text-ink-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Server className="h-3.5 w-3.5" />
+              <span>Nodemailer SMTP</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDispatchMode('oauth')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
+                dispatchMode === 'oauth'
+                  ? 'bg-ink text-ink-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+              <span>Google OAuth</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Diagnostic SMTP Card */}
+        {dispatchMode === 'smtp' ? (
+          <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-foreground">Driver:</span>
+                <span className="font-mono text-muted-foreground">
+                  {smtpStatus?.host || 'smtp.gmail.com'}:{smtpStatus?.port || 465} (SSL)
+                </span>
+                <span className="text-muted-foreground">·</span>
+                <span className="font-bold text-foreground">Sender:</span>
+                <span className="font-mono text-primary font-semibold">
+                  {smtpStatus?.user || 'verve.n.co.ke@gmail.com'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={disconnectGmail}
-                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-background text-muted-foreground hover:text-foreground border border-border cursor-pointer transition-colors"
+                  disabled={isCheckingSmtp}
+                  onClick={handleTestSmtp}
+                  className="px-3 py-1 rounded-lg bg-background border border-border hover:bg-secondary text-foreground text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  Disconnect
+                  <RefreshCw className={`h-3 w-3 ${isCheckingSmtp ? 'animate-spin' : ''}`} />
+                  <span>Test SMTP Handshake</span>
                 </button>
               </div>
+            </div>
+
+            {testSmtpResult && (
+              <div
+                className={`p-2.5 rounded-lg text-xs font-mono border ${
+                  testSmtpResult.success
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-amber-50 text-amber-900 border-amber-200'
+                }`}
+              >
+                {testSmtpResult.message}
+              </div>
+            )}
+
+            {!isSmtpReady && (
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <KeyRound className="h-3.5 w-3.5 text-amber-600" />
+                  <span>16-Character Google App Password Setup:</span>
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  To autonomously send emails without user popup login: Go to your Google Account Security &rarr; App passwords &rarr; generate a 16-character code &rarr; paste it in <code className="bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded font-mono font-bold">SMTP_PASS=xxxx yyyy zzzz wwww</code> in <code className="font-mono">.env</code>. (All spaces are automatically removed).
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 border border-border">
+            <div className="text-xs">
+              <span className="font-semibold text-foreground">Interactive Client Sign-In:</span>{' '}
+              <span className="text-muted-foreground">
+                {isGmailConnected ? `Connected as ${googleUser?.email}` : 'Sign in to send emails directly from your browser'}
+              </span>
+            </div>
+            {isGmailConnected ? (
+              <button
+                type="button"
+                onClick={disconnectGmail}
+                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-background border border-border hover:bg-secondary cursor-pointer"
+              >
+                Disconnect
+              </button>
             ) : (
               <GoogleSignInButton
                 onClick={connectGmail}
                 isLoading={isConnecting}
-                label="Connect Commission Gmail"
+                label="Sign In with Google"
               />
             )}
-          </div>
-        </div>
-
-        {lastSendError && (
-          <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{lastSendError}</span>
           </div>
         )}
       </div>
@@ -305,48 +531,62 @@ export function GmailBroadcastPanel() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          2. Dispatch Voter Password Passcards
+          2. Dispatch Official Voter Pass (PDF + QR + ICS)
+        </button>
+        <button
+          type="button"
+          onClick={() => setSubTab('gazette-notice')}
+          className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            subTab === 'gazette-notice'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          3. Commission Gazette Directives & Notices
         </button>
       </div>
 
-      {/* SUBTAB 1: BROADCAST ELECTION OUTCOMES */}
+      {/* SUBTAB 1: BROADCAST CERTIFIED RESULTS */}
       {subTab === 'broadcast' && (
-        <div className="grid lg:grid-cols-12 gap-6">
-          {/* Left Column: Settings and Target Audience */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-7 space-y-5">
             <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
-              <h3 className="font-display text-sm font-bold text-foreground flex items-center gap-2">
-                <Send className="h-4 w-4 text-primary" />
-                <span>Results Broadcast Configuration</span>
-              </h3>
-
-              {/* Target Audience */}
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1.5">
-                  Target Recipient Cohort
+                <h3 className="font-display text-sm font-bold text-foreground">
+                  Official Election Outcome Broadcast
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Sends formatted election outcomes with winner tallies, voter turnout, and returning officer declaration.
+                </p>
+              </div>
+
+              {/* Recipient Audience Selection */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-2">
+                  Target Audience
                 </label>
-                <div className="grid sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setTargetAudience('all')}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
                       targetAudience === 'all'
-                        ? 'border-primary bg-primary/5 text-foreground ring-1 ring-primary'
+                        ? 'border-primary bg-primary/10 text-primary font-bold'
                         : 'border-border bg-background text-muted-foreground hover:bg-secondary'
                     }`}
                   >
                     <div className="font-bold text-xs">All Registered Students</div>
                     <div className="text-[11px] text-muted-foreground mt-0.5">
-                      {users.length + accreditationList.length} verified Kabarak emails
+                      {users.length || totalRegistered} student accounts
                     </div>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setTargetAudience('custom')}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
                       targetAudience === 'custom'
-                        ? 'border-primary bg-primary/5 text-foreground ring-1 ring-primary'
+                        ? 'border-primary bg-primary/10 text-primary font-bold'
                         : 'border-border bg-background text-muted-foreground hover:bg-secondary'
                     }`}
                   >
@@ -396,22 +636,24 @@ export function GmailBroadcastPanel() {
 
                 <button
                   type="button"
-                  disabled={!isGmailConnected || recipientsList.length === 0 || isSending}
+                  disabled={!canSend || recipientsList.length === 0 || isSending}
                   onClick={() => setShowConfirmModal(true)}
                   className="flex-1 px-4 py-2.5 rounded-xl bg-ink hover:bg-primary text-ink-foreground text-xs font-semibold shadow-pop inline-flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 disabled:pointer-events-none"
                 >
                   <Send className="h-3.5 w-3.5" />
                   <span>
                     {isSending
-                      ? 'Dispatching via Gmail...'
+                      ? 'Dispatching via Outbox...'
                       : `Broadcast to ${recipientsList.length} Student(s)`}
                   </span>
                 </button>
               </div>
 
-              {!isGmailConnected && (
+              {!canSend && (
                 <p className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
-                  Please click <strong>"Connect Commission Gmail"</strong> above to enable live message delivery.
+                  {dispatchMode === 'smtp'
+                    ? 'Please set SMTP_PASS in .env or switch to Google OAuth mode.'
+                    : 'Please connect your Google account above to enable OAuth dispatch.'}
                 </p>
               )}
             </div>
@@ -496,11 +738,24 @@ export function GmailBroadcastPanel() {
       {subTab === 'passcards' && (
         <div className="max-w-2xl mx-auto rounded-2xl border border-border bg-card p-6 space-y-5">
           <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-primary/10 text-primary border border-primary/20">
+                MULTIPART EMAIL WITH ATTACHMENTS
+              </span>
+            </div>
             <h3 className="font-display text-base font-bold text-foreground">
-              Send Student Authentication Passcard
+              Dispatch Official Voter Polling Pass
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Directly dispatch a secured voter account password to any accredited Kabarak pharmacy student email.
+              Generates and dispatches an authentic Voter Polling Pass containing:
+              <br/>
+              1. <strong>Vector PDF Passcard</strong> (Voter-Pass-[REG].pdf) with statutory seal
+              <br/>
+              2. <strong>Inline CID-embedded QR code</strong> for physical polling check-in
+              <br/>
+              3. <strong>RFC 5545 .ics Calendar Invite</strong> with 24-hr reminder alarm
+              <br/>
+              4. <strong>Google Schema.org JSON-LD microdata</strong> for interactive Gmail inbox cards
             </p>
           </div>
 
@@ -517,18 +772,34 @@ export function GmailBroadcastPanel() {
           )}
 
           <form onSubmit={handleSendPasscard} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Student Full Name
-              </label>
-              <input
-                type="text"
-                required
-                value={passcardStudentName}
-                onChange={(e) => setPasscardStudentName(e.target.value)}
-                placeholder="e.g. Cynthia Moraa"
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary outline-none"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Student Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={passcardStudentName}
+                  onChange={(e) => setPasscardStudentName(e.target.value)}
+                  placeholder="e.g. Cynthia Moraa"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Registration Number
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={passcardRegNo}
+                  onChange={(e) => setPasscardRegNo(e.target.value)}
+                  placeholder="e.g. PHARM/2026/0142"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground font-mono focus:border-primary outline-none"
+                />
+              </div>
             </div>
 
             <div>
@@ -540,7 +811,7 @@ export function GmailBroadcastPanel() {
                 required
                 value={passcardEmail}
                 onChange={(e) => setPasscardEmail(e.target.value)}
-                placeholder="e.g. cmoraa23@kabarak.ac.ke"
+                placeholder="e.g. cmoraa23@kabarak.ac.ke or verve.n.co.ke@gmail.com"
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary outline-none"
               />
             </div>
@@ -565,7 +836,7 @@ export function GmailBroadcastPanel() {
 
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  Secret Passkey
+                  Secret Passkey / PIN
                 </label>
                 <input
                   type="text"
@@ -579,21 +850,119 @@ export function GmailBroadcastPanel() {
 
             <button
               type="submit"
-              disabled={!isGmailConnected || isSendingPasscard}
+              disabled={!canSend || isSendingPasscard}
               className="w-full py-3 rounded-xl bg-ink hover:bg-primary text-ink-foreground text-xs font-semibold shadow-pop inline-flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 disabled:pointer-events-none"
             >
               <Mail className="h-4 w-4" />
               <span>
                 {isSendingPasscard
-                  ? 'Transmitting via Gmail...'
-                  : 'Send Official Passcard via Gmail'}
+                  ? 'Compiling PDF & Dispatching...'
+                  : `Dispatch Official Voter Passcard (${dispatchMode.toUpperCase()})`}
               </span>
             </button>
           </form>
         </div>
       )}
 
-      {/* CONFIRMATION DIALOG (Mandatory for Destructive / Send Operations) */}
+      {/* SUBTAB 3: COMMISSION GAZETTE DIRECTIVES */}
+      {subTab === 'gazette-notice' && (
+        <div className="max-w-2xl mx-auto rounded-2xl border border-border bg-card p-6 space-y-5">
+          <div>
+            <h3 className="font-display text-base font-bold text-foreground">
+              Broadcast Commission Gazette Notice
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Send immediate statutory directives, nomination announcements, or polling hours notices to student inboxes.
+            </p>
+          </div>
+
+          {noticeStatus && (
+            <div
+              className={`p-3 rounded-xl text-xs font-medium border ${
+                noticeStatus.startsWith('✓')
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-destructive/10 text-destructive border-destructive/20'
+              }`}
+            >
+              {noticeStatus}
+            </div>
+          )}
+
+          <form onSubmit={handleSendNotice} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-foreground mb-1">
+                Recipient Email
+              </label>
+              <input
+                type="email"
+                required
+                value={noticeRecipient}
+                onChange={(e) => setNoticeRecipient(e.target.value)}
+                placeholder="e.g. verve.n.co.ke@gmail.com"
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary outline-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Urgency Level
+                </label>
+                <select
+                  value={noticeUrgency}
+                  onChange={(e) => setNoticeUrgency(e.target.value as any)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary outline-none"
+                >
+                  <option value="routine">Routine Gazette</option>
+                  <option value="urgent">Urgent Notice</option>
+                  <option value="critical">Critical Electoral Directive</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Notice Headline
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={noticeHeadline}
+                  onChange={(e) => setNoticeHeadline(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-foreground mb-1">
+                Notice Directive Body
+              </label>
+              <textarea
+                rows={4}
+                required
+                value={noticeBody}
+                onChange={(e) => setNoticeBody(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background p-3 text-xs text-foreground focus:border-primary outline-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={!canSend || isSendingNotice}
+              className="w-full py-3 rounded-xl bg-ink hover:bg-primary text-ink-foreground text-xs font-semibold shadow-pop inline-flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <Send className="h-4 w-4" />
+              <span>
+                {isSendingNotice
+                  ? 'Dispatching Directive...'
+                  : `Dispatch Statutory Notice (${dispatchMode.toUpperCase()})`}
+              </span>
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* CONFIRMATION DIALOG */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-card border-2 border-ink rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
@@ -608,7 +977,7 @@ export function GmailBroadcastPanel() {
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                 You are about to transmit the official certified results bulletin to{' '}
                 <strong className="text-foreground">{recipientsList.length} recipient(s)</strong>{' '}
-                using your connected Gmail account (<strong>{googleUser?.email}</strong>).
+                using the <strong className="text-primary">{dispatchMode.toUpperCase()} Engine</strong>.
               </p>
             </div>
 
@@ -622,8 +991,10 @@ export function GmailBroadcastPanel() {
                 <span className="font-mono font-bold text-foreground">{officeWinners.length}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>Delivery Route:</span>
-                <span className="font-mono font-bold text-emerald-600">Google Gmail API</span>
+                <span>Delivery Driver:</span>
+                <span className="font-mono font-bold text-emerald-600">
+                  {dispatchMode === 'smtp' ? 'Transactional Outbox + Nodemailer SSL' : 'Google Gmail OAuth API'}
+                </span>
               </div>
             </div>
 
@@ -669,8 +1040,8 @@ export function GmailBroadcastPanel() {
 
             <div className="overflow-y-auto flex-1 space-y-4 pr-1 text-xs">
               <div className="p-3 bg-secondary/40 rounded-xl space-y-1 font-mono text-[11px]">
-                <div><strong>Subject:</strong> OFFICIAL GAZETTEMENT: 2026 KUPSA Election Certified Results</div>
-                <div><strong>From:</strong> KUPSA Electoral Commission &lt;{googleUser?.email || 'elections@kabarak.ac.ke'}&gt;</div>
+                <div><strong>Subject:</strong> Official Certified KUPSA Election Results Gazettement — 2026/2027</div>
+                <div><strong>From:</strong> KUPSA Electoral Commission &lt;{smtpStatus?.user || 'verve.n.co.ke@gmail.com'}&gt;</div>
                 <div><strong>To:</strong> {recipientsList.slice(0, 3).join(', ')} {recipientsList.length > 3 ? `(+${recipientsList.length - 3} more)` : ''}</div>
               </div>
 

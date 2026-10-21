@@ -98,8 +98,8 @@ function MainApp() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground font-sans selection:bg-accent selection:text-ink antialiased">
-      {/* Commission Broadcast Notice Banner (When configured) */}
-      {announcementBanner && !isCustomLayout && (
+      {/* Commission Broadcast Notice Banner (Only displayed if actively pushed from the commissioner dashboard) */}
+      {Boolean(announcementBanner?.trim()) && !isCustomLayout && (
         <div className="bg-ink text-sun px-4 py-2 text-xs font-mono text-center border-b border-white/10 flex items-center justify-center gap-2">
           <span className="font-bold uppercase tracking-wider text-primary">Commission Notice:</span>
           <span>{announcementBanner}</span>

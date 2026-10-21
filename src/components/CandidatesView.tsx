@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ViewId, Candidate, CandidateApplication, ElectionPhase } from '../types';
 import { CANDIDATES, OFFICES, SAMPLE_CANDIDATE_APPLICATIONS } from '../data/election';
+import { useVotingStore } from '../context/VotingStore';
 import { PageIntro } from './site-shell';
 import {
   CheckCircle2,
@@ -177,6 +178,27 @@ function CandidateHoverCard({
 }
 
 export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: CandidatesViewProps) {
+  const { dbCandidates, candidateClearances } = useVotingStore();
+
+  const effectiveCandidates: Candidate[] = useMemo(() => {
+    return CANDIDATES.map((baseCand) => {
+      const dbMatch = dbCandidates?.find((c) => c.id === baseCand.id);
+      const clearance = candidateClearances[baseCand.id];
+
+      const rawStatus = clearance?.status || dbMatch?.clearance_status || 'Cleared & Certified';
+      const vettingStatus: Candidate['vettingStatus'] =
+        rawStatus === 'Cleared & Certified' ? 'Vetted & Approved' : (rawStatus as Candidate['vettingStatus']);
+
+      return {
+        ...baseCand,
+        name: clearance?.name || dbMatch?.name || baseCand.name,
+        photoUrl: clearance?.photoUrl || dbMatch?.photo_url || baseCand.photoUrl,
+        manifestoSummary: clearance?.manifestoSummary || dbMatch?.manifesto_summary || baseCand.manifestoSummary,
+        vettingStatus,
+      };
+    });
+  }, [dbCandidates, candidateClearances]);
+
   // Navigation & filtering state
   const [selectedOffice, setSelectedOffice] = useState<string>('all');
   const [onlyShortlisted, setOnlyShortlisted] = useState(false);
@@ -261,7 +283,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
       }
 
       if (candId) {
-        const found = CANDIDATES.find((c) => c.id === candId || c.name.toLowerCase().replace(/\s+/g, '-') === candId);
+        const found = effectiveCandidates.find((c) => c.id === candId || c.name.toLowerCase().replace(/\s+/g, '-') === candId);
         if (found) {
           setPickedCandidate(found);
         }
@@ -269,7 +291,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
     };
 
     handleUrlSync();
-  }, []);
+  }, [effectiveCandidates]);
 
   // Update URL when candidate panel opens/closes
   useEffect(() => {
@@ -291,7 +313,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
         setPickedCandidate(null);
       } else if (e.key === 'ArrowRight') {
         // Next candidate in filtered list
-        const currentOfficeCands = CANDIDATES.filter((c) => c.officeId === pickedCandidate.officeId);
+        const currentOfficeCands = effectiveCandidates.filter((c) => c.officeId === pickedCandidate.officeId);
         const idx = currentOfficeCands.findIndex((c) => c.id === pickedCandidate.id);
         if (idx !== -1 && idx < currentOfficeCands.length - 1) {
           setPickedCandidate(currentOfficeCands[idx + 1]);
@@ -300,7 +322,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
         }
       } else if (e.key === 'ArrowLeft') {
         // Previous candidate in filtered list
-        const currentOfficeCands = CANDIDATES.filter((c) => c.officeId === pickedCandidate.officeId);
+        const currentOfficeCands = effectiveCandidates.filter((c) => c.officeId === pickedCandidate.officeId);
         const idx = currentOfficeCands.findIndex((c) => c.id === pickedCandidate.id);
         if (idx > 0) {
           setPickedCandidate(currentOfficeCands[idx - 1]);
@@ -312,7 +334,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pickedCandidate]);
+  }, [pickedCandidate, effectiveCandidates]);
 
   // Scroll listener for sticky vote bar and scroll-spy
   useEffect(() => {
@@ -347,7 +369,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
   // Filter and sort candidates
   const processedOffices = useMemo(() => {
     return OFFICES.filter((o) => selectedOffice === 'all' || o.id === selectedOffice).map((office) => {
-      let list = CANDIDATES.filter((c) => c.officeId === office.id);
+      let list = effectiveCandidates.filter((c) => c.officeId === office.id);
 
       // Shortlist filtering
       if (onlyShortlisted) {
@@ -369,7 +391,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
         isUnopposed: list.length === 1,
       };
     });
-  }, [selectedOffice, onlyShortlisted, sortOrder, shortlist]);
+  }, [selectedOffice, onlyShortlisted, sortOrder, shortlist, effectiveCandidates]);
 
   const handleCopyShare = (cand: Candidate) => {
     const url = `${window.location.origin}${window.location.pathname}#candidates?candidate=${cand.id}`;
@@ -489,11 +511,11 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
                     : 'border-border bg-card text-foreground hover:border-ink'
                 }`}
               >
-                All Offices ({CANDIDATES.length})
+                All Offices ({effectiveCandidates.length})
               </button>
 
               {OFFICES.map((office) => {
-                const count = CANDIDATES.filter((c) => c.officeId === office.id).length;
+                const count = effectiveCandidates.filter((c) => c.officeId === office.id).length;
                 const IconComponent = OFFICE_ICONS[office.id] || Award;
                 const isActive = selectedOffice === office.id || (selectedOffice === 'all' && activeSpyOffice === office.id);
 
@@ -777,7 +799,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => {
-                    const currentOfficeCands = CANDIDATES.filter((c) => c.officeId === pickedCandidate.officeId);
+                    const currentOfficeCands = effectiveCandidates.filter((c) => c.officeId === pickedCandidate.officeId);
                     const idx = currentOfficeCands.findIndex((c) => c.id === pickedCandidate.id);
                     if (idx > 0) setPickedCandidate(currentOfficeCands[idx - 1]);
                     else setPickedCandidate(currentOfficeCands[currentOfficeCands.length - 1]);
@@ -793,7 +815,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
                 </span>
                 <button
                   onClick={() => {
-                    const currentOfficeCands = CANDIDATES.filter((c) => c.officeId === pickedCandidate.officeId);
+                    const currentOfficeCands = effectiveCandidates.filter((c) => c.officeId === pickedCandidate.officeId);
                     const idx = currentOfficeCands.findIndex((c) => c.id === pickedCandidate.id);
                     if (idx < currentOfficeCands.length - 1) setPickedCandidate(currentOfficeCands[idx + 1]);
                     else setPickedCandidate(currentOfficeCands[0]);
@@ -1164,7 +1186,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
                   style={{ gridTemplateColumns: `repeat(${compareIds.length}, minmax(0, 1fr))` }}
                 >
                   {compareIds.map((cId) => {
-                    const c = CANDIDATES.find((item) => item.id === cId);
+                    const c = effectiveCandidates.find((item) => item.id === cId);
                     if (!c) return null;
 
                     return (

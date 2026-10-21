@@ -249,10 +249,14 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
     setTimeout(() => setBannerSavedAlert(false), 2500);
   };
 
-  // Save candidate clearance update
+  // Save candidate clearance and profile update
   const handleSaveCandidateClearance = (e: React.FormEvent) => {
     e.preventDefault();
-    updateCandidateClearance(selectedCandidateId, candidateEditStatus, candidateEditNotes);
+    updateCandidateClearance(selectedCandidateId, candidateEditStatus, candidateEditNotes, {
+      name: candidateEditName,
+      photoUrl: candidateEditPhotoUrl,
+      manifestoSummary: candidateEditManifesto,
+    });
     setCandidateSavedAlert(true);
     setTimeout(() => setCandidateSavedAlert(false), 2500);
   };
@@ -1224,7 +1228,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
             {/* Candidate Edit Form */}
             <div className="rounded-3xl border-2 border-border bg-card p-6 shadow-xs space-y-5">
               <h3 className="font-display text-lg font-bold text-foreground">
-                Update Nominee Clearance Record
+                Update Nominee Details, Photo & Clearance
               </h3>
 
               <form onSubmit={handleSaveCandidateClearance} className="space-y-4">
@@ -1232,14 +1236,14 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   {/* Select Candidate */}
                   <div>
                     <label className="block text-xs font-semibold text-foreground mb-1">
-                      Select Nominee
+                      Select Nominee to Edit
                     </label>
                     <select
                       value={selectedCandidateId}
                       onChange={(e) => handleSelectCandidate(e.target.value)}
                       className="w-full rounded-xl border border-border bg-background py-2.5 px-3 text-xs sm:text-sm text-foreground focus:border-primary outline-none"
                     >
-                      {SHARED_CANDIDATES.map((c) => (
+                      {candidateList.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name} — {c.officeTitle}
                         </option>
@@ -1250,7 +1254,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   {/* Vetting Status */}
                   <div>
                     <label className="block text-xs font-semibold text-foreground mb-1">
-                      Clearance Status
+                      Statutory Clearance Status
                     </label>
                     <select
                       value={candidateEditStatus}
@@ -1262,6 +1266,64 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                       <option value="Provisional">Provisional Clearance</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {/* Candidate Name */}
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground mb-1">
+                      Candidate Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={candidateEditName}
+                      onChange={(e) => setCandidateEditName(e.target.value)}
+                      placeholder="e.g. Amina Muthoni"
+                      className="w-full rounded-xl border border-border bg-background py-2.5 px-3 text-xs sm:text-sm text-foreground focus:border-primary outline-none"
+                    />
+                  </div>
+
+                  {/* Photo URL with Thumbnail */}
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground mb-1">
+                      Official Portrait Image URL
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="url"
+                        value={candidateEditPhotoUrl}
+                        onChange={(e) => setCandidateEditPhotoUrl(e.target.value)}
+                        placeholder="https://... photo link"
+                        className="flex-1 rounded-xl border border-border bg-background py-2.5 px-3 text-xs sm:text-sm text-foreground focus:border-primary outline-none font-mono"
+                      />
+                      {candidateEditPhotoUrl && (
+                        <div className="h-9 w-9 rounded-lg overflow-hidden border border-border shrink-0 bg-secondary">
+                          <img
+                            src={candidateEditPhotoUrl}
+                            alt="Preview"
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Manifesto Summary */}
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    Manifesto Summary & Executive Platform
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={candidateEditManifesto}
+                    onChange={(e) => setCandidateEditManifesto(e.target.value)}
+                    placeholder="Short summary of candidate policy priorities and platform..."
+                    className="w-full rounded-xl border border-border bg-background p-3 text-xs text-foreground focus:border-primary outline-none"
+                  />
                 </div>
 
                 {/* Commission Notes */}
@@ -1284,13 +1346,13 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                     className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-5 py-2.5 text-xs font-semibold text-ink-foreground shadow-xs hover:bg-primary transition-colors cursor-pointer"
                   >
                     <Save className="h-3.5 w-3.5" />
-                    <span>Save Clearance Record</span>
+                    <span>Save Candidate Updates to Database</span>
                   </button>
 
                   {candidateSavedAlert && (
                     <span className="text-xs font-mono text-emerald-700 font-semibold animate-fade-in flex items-center gap-1">
                       <CheckCircle2 className="h-4 w-4" />
-                      <span>Nominee record updated!</span>
+                      <span>Nominee profile and clearance updated in Supabase!</span>
                     </span>
                   )}
                 </div>
@@ -1299,7 +1361,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
 
             {/* Candidate Directory Overview */}
             <div className="grid gap-4 sm:grid-cols-2">
-              {SHARED_CANDIDATES.map((cand) => {
+              {candidateList.map((cand) => {
                 const clearance = candidateClearances[cand.id] || {
                   status: 'Cleared & Certified',
                   notes: 'Standard statutory clearance',
@@ -1309,17 +1371,34 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   <div
                     key={cand.id}
                     onClick={() => handleSelectCandidate(cand.id)}
-                    className={`rounded-2xl border bg-card p-4 space-y-2 cursor-pointer transition-all hover:border-ink ${
+                    className={`rounded-2xl border bg-card p-4 space-y-3 cursor-pointer transition-all hover:border-ink ${
                       selectedCandidateId === cand.id ? 'border-primary ring-2 ring-primary/20 shadow-xs' : 'border-border'
                     }`}
                   >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h4 className="font-display font-bold text-foreground">{cand.name}</h4>
-                        <span className="text-xs text-muted-foreground font-mono">{cand.officeTitle}</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-11 w-11 rounded-full overflow-hidden bg-secondary border border-border shrink-0 flex items-center justify-center font-bold text-xs">
+                          {cand.photoUrl ? (
+                            <img
+                              src={cand.photoUrl}
+                              alt={cand.name}
+                              className="h-full w-full object-cover"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            cand.name.substring(0, 2).toUpperCase()
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-display font-bold text-foreground text-sm">{cand.name}</h4>
+                          <span className="text-xs text-muted-foreground font-mono">{cand.officeTitle}</span>
+                        </div>
                       </div>
+
                       <span
-                        className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
                           clearance.status === 'Cleared & Certified'
                             ? 'bg-emerald-500/10 text-emerald-800'
                             : clearance.status === 'Under Review'
@@ -1330,12 +1409,17 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                         {clearance.status}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      {clearance.notes}
-                    </p>
-                    <span className="text-[10px] font-mono text-muted-foreground block pt-1">
-                      Last review: {clearance.updatedAt}
-                    </span>
+
+                    {cand.manifestoSummary && (
+                      <p className="text-xs text-foreground/80 line-clamp-2 italic">
+                        "{cand.manifestoSummary}"
+                      </p>
+                    )}
+
+                    <div className="pt-2 border-t border-border flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+                      <span>Remarks: {clearance.notes}</span>
+                      <span>{clearance.updatedAt}</span>
+                    </div>
                   </div>
                 );
               })}
