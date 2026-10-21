@@ -6,7 +6,6 @@ import { GoogleSignInButton } from './GoogleSignInButton';
 import {
   fetchSmtpStatus,
   triggerTestSmtp,
-  dispatchVoterPassEmail,
   dispatchResultsGazetteEmail,
   dispatchNoticeEmail,
 } from '../lib/electionService';
@@ -55,7 +54,7 @@ export function GmailBroadcastPanel() {
   } = useVotingStore();
 
   // Active sub-section
-  const [subTab, setSubTab] = useState<'broadcast' | 'passcards' | 'gazette-notice'>('broadcast');
+  const [subTab, setSubTab] = useState<'broadcast' | 'gazette-notice'>('broadcast');
 
   // SMTP Driver Status
   const [smtpStatus, setSmtpStatus] = useState<{
@@ -90,15 +89,6 @@ export function GmailBroadcastPanel() {
     failed: number;
     logs: string[];
   } | null>(null);
-
-  // Passcard single dispatch state
-  const [passcardStudentName, setPasscardStudentName] = useState('');
-  const [passcardEmail, setPasscardEmail] = useState('');
-  const [passcardRegNo, setPasscardRegNo] = useState('PHARM/2026/0142');
-  const [passcardYear, setPasscardYear] = useState('Year 3');
-  const [passcardPassword, setPasscardPassword] = useState('KUP-2026');
-  const [passcardStatus, setPasscardStatus] = useState<string | null>(null);
-  const [isSendingPasscard, setIsSendingPasscard] = useState(false);
 
   // Commission Notice state
   const [noticeHeadline, setNoticeHeadline] = useState('Official Polling Station Check-in Directives');
@@ -283,52 +273,7 @@ export function GmailBroadcastPanel() {
     }
   };
 
-  // Single passcard dispatch
-  const handleSendPasscard = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!passcardEmail.trim()) return;
 
-    setIsSendingPasscard(true);
-    setPasscardStatus(null);
-
-    try {
-      if (dispatchMode === 'smtp') {
-        const res = await dispatchVoterPassEmail({
-          studentName: passcardStudentName.trim() || 'Accredited Student',
-          email: passcardEmail.trim().toLowerCase(),
-          regNo: passcardRegNo.trim(),
-          yearOfStudy: passcardYear,
-          passwordCode: passcardPassword.trim(),
-          pollingStation: 'School of Pharmacy Complex, Kabarak University',
-        });
-
-        if (res.success) {
-          setPasscardStatus(
-            `✓ Official Voter Pass (with PDF passcard, QR code, and .ics calendar invite) successfully queued & sent to ${passcardEmail} (Outbox ID: ${res.outboxId})`
-          );
-        } else {
-          setPasscardStatus(`✗ Error: ${res.error}`);
-        }
-      } else {
-        const res = await sendPasswordEmail({
-          studentName: passcardStudentName.trim() || 'Accredited Student',
-          recipientEmail: passcardEmail.trim().toLowerCase(),
-          password: passcardPassword.trim() || 'KUP-2026',
-          yearOfStudy: passcardYear,
-        });
-
-        if (res.success) {
-          setPasscardStatus(`✓ Passcard email successfully sent to ${passcardEmail} via Gmail OAuth (ID: ${res.messageId})`);
-        } else {
-          setPasscardStatus(`✗ Error: ${res.error}`);
-        }
-      }
-    } catch (err: any) {
-      setPasscardStatus(`✗ Unexpected error: ${err.message}`);
-    } finally {
-      setIsSendingPasscard(false);
-    }
-  };
 
   // Commission Notice dispatch
   const handleSendNotice = async (e: React.FormEvent) => {
@@ -524,17 +469,6 @@ export function GmailBroadcastPanel() {
         </button>
         <button
           type="button"
-          onClick={() => setSubTab('passcards')}
-          className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-            subTab === 'passcards'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          2. Dispatch Official Voter Pass (PDF + QR + ICS)
-        </button>
-        <button
-          type="button"
           onClick={() => setSubTab('gazette-notice')}
           className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
             subTab === 'gazette-notice'
@@ -542,7 +476,7 @@ export function GmailBroadcastPanel() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          3. Commission Gazette Directives & Notices
+          2. Commission Gazette Directives & Notices
         </button>
       </div>
 
@@ -734,137 +668,7 @@ export function GmailBroadcastPanel() {
         </div>
       )}
 
-      {/* SUBTAB 2: VOTER AUTH PASSCARD DISPATCH */}
-      {subTab === 'passcards' && (
-        <div className="max-w-2xl mx-auto rounded-2xl border border-border bg-card p-6 space-y-5">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-primary/10 text-primary border border-primary/20">
-                MULTIPART EMAIL WITH ATTACHMENTS
-              </span>
-            </div>
-            <h3 className="font-display text-base font-bold text-foreground">
-              Dispatch Official Voter Polling Pass
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Generates and dispatches an authentic Voter Polling Pass containing:
-              <br/>
-              1. <strong>Vector PDF Passcard</strong> (Voter-Pass-[REG].pdf) with statutory seal
-              <br/>
-              2. <strong>Inline CID-embedded QR code</strong> for physical polling check-in
-              <br/>
-              3. <strong>RFC 5545 .ics Calendar Invite</strong> with 24-hr reminder alarm
-              <br/>
-              4. <strong>Google Schema.org JSON-LD microdata</strong> for interactive Gmail inbox cards
-            </p>
-          </div>
-
-          {passcardStatus && (
-            <div
-              className={`p-3 rounded-xl text-xs font-medium border ${
-                passcardStatus.startsWith('✓')
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : 'bg-destructive/10 text-destructive border-destructive/20'
-              }`}
-            >
-              {passcardStatus}
-            </div>
-          )}
-
-          <form onSubmit={handleSendPasscard} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">
-                  Student Full Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={passcardStudentName}
-                  onChange={(e) => setPasscardStudentName(e.target.value)}
-                  placeholder="e.g. Cynthia Moraa"
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">
-                  Registration Number
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={passcardRegNo}
-                  onChange={(e) => setPasscardRegNo(e.target.value)}
-                  placeholder="e.g. PHARM/2026/0142"
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground font-mono focus:border-primary outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Kabarak Student Email
-              </label>
-              <input
-                type="email"
-                required
-                value={passcardEmail}
-                onChange={(e) => setPasscardEmail(e.target.value)}
-                placeholder="e.g. cmoraa23@kabarak.ac.ke or verve.n.co.ke@gmail.com"
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary outline-none"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">
-                  Year of Study
-                </label>
-                <select
-                  value={passcardYear}
-                  onChange={(e) => setPasscardYear(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary outline-none"
-                >
-                  <option value="Year 1">Year 1</option>
-                  <option value="Year 2">Year 2</option>
-                  <option value="Year 3">Year 3</option>
-                  <option value="Year 4">Year 4</option>
-                  <option value="Year 5">Year 5</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">
-                  Secret Passkey / PIN
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={passcardPassword}
-                  onChange={(e) => setPasscardPassword(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground font-mono focus:border-primary outline-none"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={!canSend || isSendingPasscard}
-              className="w-full py-3 rounded-xl bg-ink hover:bg-primary text-ink-foreground text-xs font-semibold shadow-pop inline-flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 disabled:pointer-events-none"
-            >
-              <Mail className="h-4 w-4" />
-              <span>
-                {isSendingPasscard
-                  ? 'Compiling PDF & Dispatching...'
-                  : `Dispatch Official Voter Passcard (${dispatchMode.toUpperCase()})`}
-              </span>
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* SUBTAB 3: COMMISSION GAZETTE DIRECTIVES */}
+      {/* SUBTAB 2: COMMISSION GAZETTE DIRECTIVES */}
       {subTab === 'gazette-notice' && (
         <div className="max-w-2xl mx-auto rounded-2xl border border-border bg-card p-6 space-y-5">
           <div>

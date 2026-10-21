@@ -94,6 +94,8 @@ export function BallotView({ onNavigate }: BallotViewProps) {
             'Enhance clinical rotation welfare and supplies',
             'Maintain transparent association financial records',
           ],
+          experience: [],
+          priorities: [],
         };
       });
     }

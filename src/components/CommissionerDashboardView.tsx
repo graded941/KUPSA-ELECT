@@ -586,92 +586,19 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                 </p>
               </div>
 
-              {/* Testing tool button: simulate incoming student vote (no fake sync icon) */}
-              <button
-                type="button"
-                onClick={() => simulateIncomingVote()}
-                className="inline-flex items-center gap-1.5 rounded-full border-2 border-ink bg-primary/10 text-primary px-4 py-2 text-xs font-semibold shadow-xs hover:bg-primary hover:text-primary-foreground transition-colors self-start sm:self-auto cursor-pointer"
-                title="Generates a mock vote to test live tally reactivity"
+              {/* Simple Live Database Sync Indicator */}
+              <div
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-mono font-medium text-foreground shadow-2xs self-start sm:self-auto"
+                title={isRealtimeConnected ? 'Live Database Synchronized (Real-time active)' : 'Database Connected'}
               >
-                <Vote className="h-3.5 w-3.5" />
-                <span>Simulate student vote</span>
-              </button>
-            </div>
-
-            {/* Supabase Live Database Status Plaque */}
-            <div className="rounded-2xl border-2 border-ink bg-card p-4 sm:p-5 shadow-xs space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-sun shrink-0">
-                    <Database className="h-5 w-5" />
-                    <span
-                      className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${
-                        isRealtimeConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-display text-sm font-bold text-foreground">
-                        Supabase Database Synchronized
-                      </h4>
-                      <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-500/15 px-2 py-0.5 rounded">
-                        {isRealtimeConnected ? 'REALTIME WEBSOCKET ACTIVE' : 'CONNECTED'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                      Endpoint: fhpybihsdyyjskvwkazz.supabase.co · Last sync: {lastSyncTime || 'Active'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => refreshDbState()}
-                    disabled={isLoadingDb}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary cursor-pointer"
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${isLoadingDb ? 'animate-spin' : ''}`} />
-                    <span>Sync Now</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setIsSeeding(true);
-                      try {
-                        const res = await seedOfficialRoster();
-                        setSeedSuccessMessage(res.message);
-                        setTimeout(() => setSeedSuccessMessage(null), 4000);
-                      } catch (e: any) {
-                        alert(e.message);
-                      } finally {
-                        setIsSeeding(false);
-                      }
-                    }}
-                    disabled={isSeeding}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-1.5 text-xs font-semibold text-ink-foreground hover:bg-primary transition-colors cursor-pointer"
-                  >
-                    <Sparkles className="h-3.5 w-3.5 text-sun" />
-                    <span>{isSeeding ? 'Seeding...' : 'Seed Official 2026/2027 Roster'}</span>
-                  </button>
-                </div>
+                <span className="relative flex h-2 w-2">
+                  <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${isRealtimeConnected ? 'bg-emerald-400 animate-ping' : 'bg-emerald-500'}`} />
+                  <span className={`relative inline-flex h-2 w-2 rounded-full ${isRealtimeConnected ? 'bg-emerald-500' : 'bg-emerald-600'}`} />
+                </span>
+                <span className="text-[11px] text-foreground font-semibold">
+                  {isRealtimeConnected ? 'DB Synced' : 'Live Connected'}
+                </span>
               </div>
-
-              {seedSuccessMessage && (
-                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-800 flex items-center gap-2 animate-in fade-in">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span>{seedSuccessMessage}</span>
-                </div>
-              )}
-
-              {resetSuccessMessage && (
-                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-800 flex items-center gap-2 animate-in fade-in">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span>{resetSuccessMessage}</span>
-                </div>
-              )}
             </div>
 
             {/* Top 4 Statutory Metric Cards */}
@@ -1035,62 +962,6 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                 ))}
               </div>
             </div>
-
-            {/* Prototype Testing Tools */}
-            <div className="rounded-2xl border border-dashed border-border bg-secondary/30 p-5 space-y-4">
-              <div>
-                <h4 className="font-display text-sm font-bold text-foreground">
-                  Prototype Evaluation & Reset Tools
-                </h4>
-                <p className="text-xs text-muted-foreground">
-                  Convenience utilities for testing vote casting, resets, and live tally reactions.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => simulateIncomingVote()}
-                  className="rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <Vote className="h-3.5 w-3.5 text-primary" />
-                  <span>Simulate 1 Student Vote</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setIsSeeding(true);
-                    try {
-                      const res = await seedOfficialRoster();
-                      alert(res.message);
-                    } catch (e: any) {
-                      alert(e.message);
-                    } finally {
-                      setIsSeeding(false);
-                    }
-                  }}
-                  disabled={isSeeding}
-                  className="rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-mono text-foreground hover:bg-secondary transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <Sparkles className="h-3.5 w-3.5 text-primary" />
-                  <span>{isSeeding ? 'Seeding...' : 'Seed Official 2026/2027 Roster to DB'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (window.confirm('Are you sure you want to purge all ballots for live polling day? This cannot be undone.')) {
-                      await resetAllBallots();
-                      alert('Ballots purged. Database clean for Polling Day.');
-                    }
-                  }}
-                  className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-xs font-mono text-destructive hover:bg-destructive/10 transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <span>Purge All Ballots (Start Live Polling Clean)</span>
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
@@ -1377,19 +1248,8 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="h-11 w-11 rounded-full overflow-hidden bg-secondary border border-border shrink-0 flex items-center justify-center font-bold text-xs">
-                          {cand.photoUrl ? (
-                            <img
-                              src={cand.photoUrl}
-                              alt={cand.name}
-                              className="h-full w-full object-cover"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLElement).style.display = 'none';
-                              }}
-                            />
-                          ) : (
-                            cand.name.substring(0, 2).toUpperCase()
-                          )}
+                        <div className="h-11 w-11 rounded-full bg-primary/10 border-2 border-primary/20 shrink-0 flex items-center justify-center font-display font-bold text-xs text-primary">
+                          {cand.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
                         <div>
                           <h4 className="font-display font-bold text-foreground text-sm">{cand.name}</h4>
@@ -1454,25 +1314,27 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                       <th className="p-3.5">Receipt Hash</th>
                       <th className="p-3.5">Timestamp</th>
                       <th className="p-3.5">Cohort</th>
-                      <th className="p-3.5">Chairperson Choice</th>
-                      <th className="p-3.5">Vice Chair Choice</th>
+                      <th className="p-3.5">President Choice</th>
+                      <th className="p-3.5">Vice President Choice</th>
                       <th className="p-3.5 text-right">Integrity Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {votes.slice(0, 30).map((v) => {
-                      const chairCand = SHARED_CANDIDATES.find((c) => c.id === v.choices.chairperson);
-                      const vcCand = SHARED_CANDIDATES.find((c) => c.id === v.choices['vice-chairperson']);
+                      const presChoice = v.choices.president || v.choices.chairperson;
+                      const vcChoice = v.choices['vice-president'] || v.choices['vice-chairperson'];
+                      const presCand = SHARED_CANDIDATES.find((c) => c.id === presChoice);
+                      const vcCand = SHARED_CANDIDATES.find((c) => c.id === vcChoice);
                       return (
                         <tr key={v.id} className="hover:bg-secondary/30 transition-colors">
                           <td className="p-3.5 font-mono text-primary font-bold">{v.receiptCode}</td>
                           <td className="p-3.5 font-mono text-muted-foreground">{v.timestamp}</td>
                           <td className="p-3.5 font-mono text-foreground">{v.voterYear}</td>
                           <td className="p-3.5 font-medium text-foreground">
-                            {chairCand ? chairCand.name : v.choices.chairperson === 'abstain' ? 'Abstained' : 'None'}
+                            {presCand ? presCand.name : presChoice === 'abstain' ? 'Abstained' : 'None'}
                           </td>
                           <td className="p-3.5 font-medium text-foreground">
-                            {vcCand ? vcCand.name : v.choices['vice-chairperson'] === 'abstain' ? 'Abstained' : 'None'}
+                            {vcCand ? vcCand.name : vcChoice === 'abstain' ? 'Abstained' : 'None'}
                           </td>
                           <td className="p-3.5 text-right">
                             <span className="inline-flex items-center gap-1 font-mono text-[10px] text-emerald-700 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">

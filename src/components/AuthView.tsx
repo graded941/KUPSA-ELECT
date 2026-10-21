@@ -139,7 +139,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
   };
 
   // Handle Log In
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
 
@@ -149,12 +149,12 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
     }
 
     if (!loginPassword.trim()) {
-      setLoginError('Please enter your account password');
+      setLoginError('Please enter your 6-digit access PIN from your student email');
       return;
     }
 
     setIsSubmitting(true);
-    const res = login(loginEmail, loginPassword);
+    const res = await login(loginEmail, loginPassword);
     setIsSubmitting(false);
 
     if (!res.success) {
@@ -565,7 +565,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs font-semibold text-foreground">
-                        Account Password
+                        Official Access PIN
                       </label>
                       <button
                         type="button"
@@ -574,7 +574,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                         }}
                         className="text-[11px] text-primary hover:underline"
                       >
-                        Need password? Sign up
+                        Need PIN? Sign up
                       </button>
                     </div>
                     <div className="relative">
@@ -587,8 +587,8 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                           setLoginPassword(e.target.value);
                           if (loginError) setLoginError(null);
                         }}
-                        placeholder="Enter password"
-                        className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                        placeholder="e.g. KUP-123456"
+                        className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-10 text-sm text-foreground font-mono placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                       />
                       <button
                         type="button"

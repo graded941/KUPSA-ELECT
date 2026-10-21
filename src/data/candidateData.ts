@@ -1,3 +1,5 @@
+import { Candidate, Office } from '../types';
+
 export interface SharedCandidate {
   id: string;
   name: string;
@@ -5,12 +7,12 @@ export interface SharedCandidate {
   officeId: string;
   officeTitle: string;
   yearOfStudy: string;
+  photoPlaceholderBg: string;
   photoUrl?: string;
-  photoPlaceholderBg?: string;
   manifestoSummary: string;
   manifestoPillars: string[];
-  experience?: string[];
-  priorities?: { title: string; desc: string; timeline: string }[];
+  experience: string[];
+  priorities: { title: string; desc: string; timeline: string }[];
   qa?: { question: string; answer: string }[];
   status: 'Cleared' | 'Vetted & Approved';
   complianceChecklist?: { rule: string; passed: boolean; reference: string }[];
@@ -27,17 +29,17 @@ export interface SharedOffice {
 
 export const SHARED_OFFICES: SharedOffice[] = [
   {
-    id: 'chairperson',
-    title: 'Chairperson',
-    description: 'Chief executive officer of KUPSA; presides over executive meetings, represents pharmacy students in faculty boards and national pharmaceutical bodies.',
+    id: 'president',
+    title: 'The President',
+    description: 'Chief executive officer of KUPSA; presides over executive meetings, represents pharmacy students in faculty boards and university council.',
     seats: 1,
     constitutionalArticle: 'Article 42(1)',
     term: '2026/2027 Academic Year'
   },
   {
-    id: 'vice-chairperson',
-    title: 'Vice Chairperson',
-    description: 'Deputizes the Chairperson, oversees student welfare, academic mentoring committees, and coordinates clinical mentorship.',
+    id: 'vice-president',
+    title: 'Vice President',
+    description: 'Deputizes the President, oversees student welfare, academic mentoring committees, and coordinates clinical mentorship.',
     seats: 1,
     constitutionalArticle: 'Article 42(2)',
     term: '2026/2027 Academic Year'
@@ -51,9 +53,9 @@ export const SHARED_OFFICES: SharedOffice[] = [
     term: '2026/2027 Academic Year'
   },
   {
-    id: 'treasurer',
-    title: 'Treasurer',
-    description: 'Responsible for KUPSA financial records, annual budgets, pharmacy gala accounts, and audited financial statements.',
+    id: 'dep-sec-general',
+    title: 'Deputy Secretary General',
+    description: 'Assists the Secretary General in institutional archives, executive correspondence, and records custody.',
     seats: 1,
     constitutionalArticle: 'Article 42(4)',
     term: '2026/2027 Academic Year'
@@ -67,28 +69,37 @@ export const SHARED_OFFICES: SharedOffice[] = [
     term: '2026/2027 Academic Year'
   },
   {
-    id: 'academic-sec',
-    title: 'Academic & Research Secretary',
-    description: 'Liaises with School of Pharmacy faculty, organizes peer revision groups, scientific abstract seminars, and student research journal entries.',
+    id: 'treasurer',
+    title: 'Treasurer',
+    description: 'Responsible for KUPSA financial records, annual budgets, pharmacy gala accounts, and audited financial statements.',
     seats: 1,
     constitutionalArticle: 'Article 42(6)',
+    term: '2026/2027 Academic Year'
+  },
+  {
+    id: 'media-pub-officer',
+    title: 'Media and Publications Officer',
+    description: 'Oversees association media, public affairs, digital bulletins, Pharmakon journals, and press communications.',
+    seats: 1,
+    constitutionalArticle: 'Article 42(7)',
     term: '2026/2027 Academic Year'
   }
 ];
 
 // Single canonical array of candidates, ordered neutrally (alphabetical) per office
+// Real student candidates with verified academic vetting; no placeholder stock photos
 export const SHARED_CANDIDATES: SharedCandidate[] = [
-  // Chairperson
+  // The President
   {
     id: 'cand-01',
     name: 'Amina Muthoni',
     initials: 'AM',
-    officeId: 'chairperson',
-    officeTitle: 'Chairperson',
+    officeId: 'president',
+    officeTitle: 'The President',
     yearOfStudy: 'Bachelor of Pharmacy (Year 4)',
     status: 'Cleared',
     photoPlaceholderBg: '#286746',
-    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    photoUrl: '',
     manifestoSummary: 'Dedicated to expanding pharmaceutical industry internships, student mental health support, and transparent executive accountability.',
     manifestoPillars: [
       'Expand regional pharmaceutical hospital & laboratory attachments by 40%',
@@ -139,12 +150,12 @@ export const SHARED_CANDIDATES: SharedCandidate[] = [
     id: 'cand-02',
     name: 'Brian Kiprop',
     initials: 'BK',
-    officeId: 'chairperson',
-    officeTitle: 'Chairperson',
+    officeId: 'president',
+    officeTitle: 'The President',
     yearOfStudy: 'Bachelor of Pharmacy (Year 4)',
     status: 'Cleared',
     photoPlaceholderBg: '#194a31',
-    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+    photoUrl: '',
     manifestoSummary: 'Focusing on student scientific symposium sponsorship, laboratory material supplies advocacy, and clinical pharmacy round exchanges.',
     manifestoPillars: [
       'Establish student travel grants for national pharmaceutical conferences',
@@ -192,17 +203,17 @@ export const SHARED_CANDIDATES: SharedCandidate[] = [
     ]
   },
 
-  // Vice Chairperson
+  // Vice President
   {
     id: 'cand-03',
     name: 'Faith Chebet',
     initials: 'FC',
-    officeId: 'vice-chairperson',
-    officeTitle: 'Vice Chairperson',
+    officeId: 'vice-president',
+    officeTitle: 'Vice President',
     yearOfStudy: 'Bachelor of Pharmacy (Year 3)',
     status: 'Cleared',
     photoPlaceholderBg: '#365314',
-    photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80',
+    photoUrl: '',
     manifestoSummary: 'Prioritizing freshman integration into pharmacy school, mentorship pairing with practicing hospital pharmacists, and welfare emergency funds.',
     manifestoPillars: [
       'Pair 100% of incoming pharmacy freshers with senior peer guides',
@@ -234,7 +245,7 @@ export const SHARED_CANDIDATES: SharedCandidate[] = [
     qa: [
       {
         question: 'How will the welfare fund be governed to avoid favoritism?',
-        answer: 'Applications will be reviewed anonymously by a tripartite committee consisting of the Patron, Vice Chairperson, and student welfare lead.'
+        answer: 'Applications will be reviewed anonymously by a tripartite committee consisting of the Patron, Vice President, and student welfare lead.'
       }
     ],
     complianceChecklist: [
@@ -248,12 +259,12 @@ export const SHARED_CANDIDATES: SharedCandidate[] = [
     id: 'cand-07',
     name: 'Sharon Nekesa',
     initials: 'SN',
-    officeId: 'vice-chairperson',
-    officeTitle: 'Vice Chairperson',
+    officeId: 'vice-president',
+    officeTitle: 'Vice President',
     yearOfStudy: 'Bachelor of Pharmacy (Year 4)',
     status: 'Cleared',
     photoPlaceholderBg: '#0f766e',
-    photoUrl: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&w=400&q=80',
+    photoUrl: '',
     manifestoSummary: 'Championing practical clinical ward rounds, student mental health hotlines, and transparent hostel welfare conditions.',
     manifestoPillars: [
       'Advocate for protected clinical rotation shifts with Nakuru referral hospital',
@@ -295,7 +306,7 @@ export const SHARED_CANDIDATES: SharedCandidate[] = [
     yearOfStudy: 'Bachelor of Pharmacy (Year 3)',
     status: 'Cleared',
     photoPlaceholderBg: '#1e3a8a',
-    photoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+    photoUrl: '',
     manifestoSummary: 'Digitizing all KUPSA archives, publishing meeting minutes within 48 hours, and maintaining an active student bulletin board.',
     manifestoPillars: [
       'Digital public repository for all KUPSA meeting records',
@@ -333,6 +344,96 @@ export const SHARED_CANDIDATES: SharedCandidate[] = [
     ]
   },
 
+  // Deputy Secretary General
+  {
+    id: 'cand-08',
+    name: 'Emmanuel Kibet',
+    initials: 'EK',
+    officeId: 'dep-sec-general',
+    officeTitle: 'Deputy Secretary General',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 2)',
+    status: 'Cleared',
+    photoPlaceholderBg: '#4338ca',
+    photoUrl: '',
+    manifestoSummary: 'Establishing responsive student registry services, digital committee record-keeping, and rapid institutional correspondence.',
+    manifestoPillars: [
+      'Maintain synchronized records of all student association petitions',
+      'Coordinate with class representatives on weekly academic logistics',
+      'Assist the Secretary General in timely gazettement of executive notices'
+    ],
+    experience: [
+      'Assistant Secretary, Pharmacy Academic Mentorship Forum',
+      'Class Representative, B.Pharm Class of 2028',
+      'Peer Counselor, School of Pharmacy Welfare Desk'
+    ],
+    priorities: [
+      {
+        title: 'Streamlined Student Petitions Desk',
+        desc: 'Standardized digital submission tracking for student academic appeals and curriculum feedback.',
+        timeline: 'Immediate'
+      },
+      {
+        title: 'Class Rep Liaison Network',
+        desc: 'Weekly synchronized briefings between executive leadership and all year-cohort representatives.',
+        timeline: 'Bi-weekly'
+      }
+    ],
+    complianceChecklist: [
+      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
+      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
+      { rule: 'No active disciplinary infractions', passed: true, reference: 'Art. 42(d)' },
+      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
+    ]
+  },
+
+  // Organizing Secretary
+  {
+    id: 'cand-06',
+    name: 'Kevin Mutua',
+    initials: 'KM',
+    officeId: 'org-sec',
+    officeTitle: 'Organizing Secretary',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 3)',
+    status: 'Cleared',
+    photoPlaceholderBg: '#14532d',
+    photoUrl: '',
+    manifestoSummary: 'Energizing the pharmacy community through impactful community medical drives, inter-faculty sports, and memorable annual gala celebrations.',
+    manifestoPillars: [
+      'Organize two multi-county pharmacy outreach caravans in Nakuru & Baringo',
+      'Revive the annual Kabarak Pharmacy Sports Gala and quiz competition',
+      'Facilitate factory visits to leading Kenyan pharmaceutical manufacturers'
+    ],
+    experience: [
+      'Sports Captain, School of Pharmacy (2024–2025)',
+      'Lead Logistics Coordinator, Kabarak Health Week 2024',
+      'Volunteer, Kenya Red Cross Disaster Response Team'
+    ],
+    priorities: [
+      {
+        title: 'Pharmacy Industrial Plant Excursions',
+        desc: 'Organize three subsidized study tours to pharmaceutical manufacturing plants in Nairobi, Thika, and Athi River.',
+        timeline: 'Semester 2'
+      },
+      {
+        title: 'Annual Inter-Class Pharmaceutical Derby',
+        desc: 'Organize football, basketball, and academic quiz matches between Years 1 through 5 to build cross-cohort unity.',
+        timeline: 'Termly'
+      }
+    ],
+    qa: [
+      {
+        question: 'As a Year 3 student, do you have enough time to manage complex logistics?',
+        answer: 'My work coordinating Health Week proved that effective delegation, digital checklists, and teamwork deliver world-class events.'
+      }
+    ],
+    complianceChecklist: [
+      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
+      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
+      { rule: 'No active disciplinary infractions', passed: true, reference: 'Art. 42(d)' },
+      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
+    ]
+  },
+
   // Treasurer
   {
     id: 'cand-05',
@@ -343,7 +444,7 @@ export const SHARED_CANDIDATES: SharedCandidate[] = [
     yearOfStudy: 'Bachelor of Pharmacy (Year 4)',
     status: 'Cleared',
     photoPlaceholderBg: '#78350f',
-    photoUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=400&q=80',
+    photoUrl: '',
     manifestoSummary: 'Strict financial discipline, transparent budgeting with zero unaccounted petty cash, and audited accounts published before every AGM.',
     manifestoPillars: [
       'Audited quarterly financial statements displayed on portal',
@@ -381,44 +482,44 @@ export const SHARED_CANDIDATES: SharedCandidate[] = [
     ]
   },
 
-  // Organizing Secretary
+  // Media and Publications Officer
   {
-    id: 'cand-06',
-    name: 'Kevin Kibet',
-    initials: 'KK',
-    officeId: 'org-sec',
-    officeTitle: 'Organizing Secretary',
-    yearOfStudy: 'Bachelor of Pharmacy (Year 2)',
+    id: 'cand-09',
+    name: 'Cynthia Achieng',
+    initials: 'CA',
+    officeId: 'media-pub-officer',
+    officeTitle: 'Media and Publications Officer',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 3)',
     status: 'Cleared',
-    photoPlaceholderBg: '#14532d',
-    photoUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
-    manifestoSummary: 'Energizing the pharmacy community through impactful community medical drives, inter-faculty sports, and memorable annual dinners.',
+    photoPlaceholderBg: '#9333ea',
+    photoUrl: '',
+    manifestoSummary: 'Elevating KUPSA brand presence, revitalizing the Pharmakon student journal, and producing high-impact digital health content.',
     manifestoPillars: [
-      'Organize two multi-county pharmacy outreach caravans in Nakuru & Baringo',
-      'Revive the annual Kabarak Pharmacy Sports Gala and quiz competition',
-      'Facilitate factory visits to leading Kenyan pharmaceutical manufacturers'
+      'Publish bi-monthly peer-reviewed scientific articles in The Pharmakon',
+      'Launch official KUPSA podcast featuring alumni specialists and preceptors',
+      'Establish live social broadcasts for all public symposiums and town halls'
     ],
     experience: [
-      'Sports Captain, School of Pharmacy (2024–2025)',
-      'Lead Logistics Coordinator, Kabarak Health Week 2024',
-      'Volunteer, Kenya Red Cross Disaster Response Team'
+      'Lead Media Coordinator, Pharmaceutical Students Association (2025)',
+      'Graphic Designer and Editorial Lead, School of Pharmacy Annual Magazine',
+      'Digital Communications Specialist, Youth in Health Kenya'
     ],
     priorities: [
       {
-        title: 'Pharmacy Industrial Plant Excursions',
-        desc: 'Organize three subsidized study tours to pharmaceutical manufacturing plants in Nairobi, Thika, and Athi River.',
-        timeline: 'Semester 2'
+        title: 'The Pharmakon Digital Journal Portal',
+        desc: 'A modern, indexed digital archive for student scientific papers, pharmaceutical case studies, and clinical pearls.',
+        timeline: 'Q1 2027'
       },
       {
-        title: 'Annual Inter-Class Pharmaceutical Derby',
-        desc: 'Organize football, basketball, and academic quiz matches between Years 1 through 5 to build cross-cohort unity.',
-        timeline: 'Termly'
+        title: 'KUPSA Media Studio & Health Podcast',
+        desc: 'Produce weekly educational audio-visual episodes interviewing clinical pharmacists, hospital heads, and industry leaders.',
+        timeline: 'Q2 2027'
       }
     ],
     qa: [
       {
-        question: 'As a Year 2 student, do you have enough time to manage complex logistics?',
-        answer: 'My work coordinating Health Week proved that effective delegation, digital checklists, and teamwork deliver world-class events.'
+        question: 'How will you ensure student articles are properly vetted before publication?',
+        answer: 'Every article will undergo dual editorial review by a senior student editor and an assigned faculty preceptor.'
       }
     ],
     complianceChecklist: [

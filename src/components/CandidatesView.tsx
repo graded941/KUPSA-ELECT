@@ -29,6 +29,8 @@ import {
   Briefcase,
   Layers,
   Vote,
+  BookOpen,
+  Newspaper,
   ExternalLink
 } from 'lucide-react';
 import { HoverTransition } from './ui/hover-transition';
@@ -40,22 +42,24 @@ interface CandidatesViewProps {
 
 // Icon mapping per office ID
 const OFFICE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  chairperson: Award,
-  'vice-chairperson': Users,
+  president: Award,
+  'vice-president': Users,
   'sec-general': FileText,
-  treasurer: Coins,
+  'dep-sec-general': BookOpen,
   'org-sec': Megaphone,
-  'academic-sec': GraduationCap,
+  treasurer: Coins,
+  'media-pub-officer': Newspaper,
 };
 
 // One-line "what this role does"
 const OFFICE_ONE_LINERS: Record<string, string> = {
-  chairperson: 'Chief executive officer; represents the association to the University Council and School of Pharmacy.',
-  'vice-chairperson': 'Deputizes executive functions, champions student welfare, and coordinates clinical mentorship.',
+  president: 'Chief executive officer; presides over executive meetings and represents pharmacy students.',
+  'vice-president': 'Deputizes executive functions, champions student welfare, and coordinates clinical mentorship.',
   'sec-general': 'Custodian of all official records, public meeting minutes, and association communications.',
-  treasurer: 'Manages association bank accounts, sponsorship revenues, and audited financial statements.',
+  'dep-sec-general': 'Assists the Secretary General in institutional archives, correspondence, and records custody.',
   'org-sec': 'Leads pharmacy week outreach caravans, plant tours, sports galas, and social logistics.',
-  'academic-sec': 'Liaises with faculty on exams, peer tutorials, research journals, and laboratory materials.',
+  treasurer: 'Manages association bank accounts, sponsorship revenues, and audited financial statements.',
+  'media-pub-officer': 'Oversees association media, public affairs, digital bulletins, and publications.',
 };
 
 const SHORTLIST_STORAGE_KEY = 'kupsa_candidate_shortlist_v1';
@@ -232,7 +236,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
     fullName: '',
     regNo: '',
     email: '',
-    officeId: 'chairperson',
+    officeId: 'president',
     yearOfStudy: 'Bachelor of Pharmacy (Year 4)',
     gpa: '3.42',
     manifestoSummary: '',
@@ -364,7 +368,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
     return () => window.removeEventListener('scroll', handleScroll);
   }, [selectedOffice]);
 
-  const [activeSpyOffice, setActiveSpyOffice] = useState<string>('chairperson');
+  const [activeSpyOffice, setActiveSpyOffice] = useState<string>('president');
 
   // Filter and sort candidates
   const processedOffices = useMemo(() => {
@@ -427,7 +431,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
         fullName: '',
         regNo: '',
         email: '',
-        officeId: 'chairperson',
+        officeId: 'president',
         yearOfStudy: 'Bachelor of Pharmacy (Year 4)',
         gpa: '3.42',
         manifestoSummary: '',

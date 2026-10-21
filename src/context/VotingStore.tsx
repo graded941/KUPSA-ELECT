@@ -8,6 +8,8 @@ import {
   updateCandidateClearanceApi,
   updateVoterAccreditationApi,
   registerVoterApi,
+  loginVoterApi,
+  resendVoterPinApi,
   resetAllBallotsApi,
   subscribeToElectionRealtime,
   DbOffice,
@@ -115,7 +117,7 @@ interface VotingStoreContextType {
 
   // Auth actions
   signUp: (name: string, email: string, yearOfStudy: string) => Promise<{ success: boolean; error?: string; password?: string; user?: VoterUser }>;
-  login: (email: string, password: string) => { success: boolean; error?: string; user?: VoterUser };
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: VoterUser }>;
   logout: () => void;
   castVote: (choices: Record<string, string>) => Promise<{ success: boolean; receiptCode: string; timestamp: string }>;
   simulateIncomingVote: () => CastVote;
@@ -554,74 +556,124 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return { success: false, error: 'Full name is required' };
     }
 
-    const randomDigits = Math.floor(1000 + Math.random() * 9000);
-    const generatedPassword = `KUP-${randomDigits}`;
+    let authoritativePassword = '';
+    let dbVoterRecord: any = null;
+
+    try {
+      const regRes = await registerVoterApi({
+        name: cleanName,
+        email: cleanEmail,
+        yearOfStudy,
+      });
+
+      if (regRes.alreadyExists) {
+        return {
+          success: false,
+          error: 'An account is already registered for this university email. Please log in with your access PIN.',
+        };
+      }
+
+      if (regRes.password) {
+        authoritativePassword = regRes.password;
+      }
+      dbVoterRecord = regRes.voter;
+      refreshDbState();
+    } catch (e: any) {
+      console.warn('Backend registration notice:', e);
+    }
+
+    // Fallback PIN if backend did not provide one (e.g. offline dev mode)
+    if (!authoritativePassword) {
+      authoritativePassword = `KUP-${Math.floor(100000 + Math.random() * 900000)}`;
+    }
 
     const newUser: VoterUser = {
       email: cleanEmail,
       name: cleanName,
       yearOfStudy,
-      password: generatedPassword,
-      hasVoted: false,
+      password: authoritativePassword,
+      hasVoted: dbVoterRecord?.has_voted || false,
     };
 
     const newEmail: SimulatedEmail = {
       id: `email-${Date.now()}`,
       recipientEmail: cleanEmail,
       recipientName: cleanName,
-      subject: 'Your Official KUPSA Election Portal Password',
-      password: generatedPassword,
+      subject: 'Your Official KUPSA Election Portal Access PIN',
+      password: authoritativePassword,
       sentAt: 'Just now',
     };
 
     setUsers((prev) => [newUser, ...prev.filter((u) => u.email.toLowerCase() !== cleanEmail)]);
     setSimulatedEmails((prev) => [newEmail, ...prev]);
 
-    // Register in Supabase database
-    try {
-      await registerVoterApi({
-        name: cleanName,
-        email: cleanEmail,
-        yearOfStudy,
-      });
-      // Refresh voter roll
-      refreshDbState();
-    } catch (e) {
-      console.warn('DB registration notice:', e);
-    }
-
     return {
       success: true,
-      password: generatedPassword,
+      password: authoritativePassword,
       user: newUser,
     };
   };
 
   // Login
-  const login = (email: string, password: string) => {
+  const login = async (email: string, password: string) => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanPass = password.trim();
 
-    const user = users.find((u) => u.email.toLowerCase() === cleanEmail);
+    // 1. Authenticate with backend / Supabase
+    try {
+      const authRes = await loginVoterApi({ email: cleanEmail, password: cleanPass });
+      if (authRes.success && authRes.voter) {
+        const v = authRes.voter;
+        const authenticatedUser: VoterUser = {
+          email: v.email,
+          name: v.name || v.fullName || cleanEmail.split('@')[0],
+          yearOfStudy: v.yearOfStudy || 'Year 3',
+          password: cleanPass,
+          hasVoted: Boolean(v.hasVoted),
+          votedAt: v.votedAt,
+          receiptCode: v.receiptCode,
+        };
 
-    if (!user) {
+        setCurrentUser(authenticatedUser);
+        setUsers((prev) => [authenticatedUser, ...prev.filter((u) => u.email.toLowerCase() !== cleanEmail)]);
+        try {
+          sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(authenticatedUser));
+        } catch {
+          // ignore
+        }
+        return { success: true, user: authenticatedUser };
+      }
+    } catch (err: any) {
+      if (err.message && !err.message.includes('Failed to fetch')) {
+        return { success: false, error: err.message };
+      }
+    }
+
+    // 2. Offline / local fallback validation (for test sample students)
+    const localUser = users.find((u) => u.email.toLowerCase() === cleanEmail);
+    if (!localUser) {
       return {
         success: false,
         error: 'No account registered with this email. Please check your address or sign up first.',
       };
     }
 
-    if (user.password !== cleanPass) {
+    if (localUser.password !== cleanPass) {
       return {
         success: false,
-        error: 'Incorrect password. Passwords are sent to your Kabarak email address.',
+        error: 'Incorrect PIN. Passwords are sent to your Kabarak email address.',
       };
     }
 
-    setCurrentUser(user);
+    setCurrentUser(localUser);
+    try {
+      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(localUser));
+    } catch {
+      // ignore
+    }
     return {
       success: true,
-      user,
+      user: localUser,
     };
   };
 
@@ -713,19 +765,28 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const resendEmail = (email: string) => {
-    const user = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-    if (!user) return false;
+    const cleanEmail = email.trim().toLowerCase();
+    resendVoterPinApi({ email: cleanEmail })
+      .then((res) => {
+        if (res.password) {
+          setUsers((prev) =>
+            prev.map((u) => (u.email.toLowerCase() === cleanEmail ? { ...u, password: res.password! } : u))
+          );
+          setSimulatedEmails((prev) => [
+            {
+              id: `email-${Date.now()}`,
+              recipientEmail: cleanEmail,
+              recipientName: cleanEmail.split('@')[0],
+              subject: 'Your Official KUPSA Election Portal Access PIN (Resent)',
+              password: res.password!,
+              sentAt: 'Just now',
+            },
+            ...prev.filter((e) => e.recipientEmail.toLowerCase() !== cleanEmail),
+          ]);
+        }
+      })
+      .catch((err) => console.warn('Resend PIN API notice:', err));
 
-    const updatedEmail: SimulatedEmail = {
-      id: `email-${Date.now()}`,
-      recipientEmail: user.email,
-      recipientName: user.name,
-      subject: 'Your Official KUPSA Election Portal Password (Resent)',
-      password: user.password,
-      sentAt: 'Just now',
-    };
-
-    setSimulatedEmails((prev) => [updatedEmail, ...prev.filter((e) => e.recipientEmail !== user.email)]);
     return true;
   };
 
