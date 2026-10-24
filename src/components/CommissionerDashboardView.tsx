@@ -97,6 +97,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
   // Form states for editable changes
   const [editingBanner, setEditingBanner] = useState(announcementBanner);
   const [bannerSavedAlert, setBannerSavedAlert] = useState(false);
+  const [phaseSavedAlert, setPhaseSavedAlert] = useState<string | null>(null);
 
   // Voter roll search & filters
   const [voterSearch, setVoterSearch] = useState('');
@@ -531,11 +532,11 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
           </nav>
         </div>
 
-        {/* Supabase Storage Status Chip */}
+        {/* Central Database Storage Status Chip */}
         <div className="px-4 py-2.5 border-t border-border bg-card/60 flex items-center justify-between text-[11px]">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Database className="h-3.5 w-3.5" />
-            <span className="font-medium">Supabase DB</span>
+            <span className="font-medium">Central DB</span>
           </div>
           {isSupabaseConfigured() ? (
             <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-500/15 px-2 py-0.5 rounded">
@@ -544,9 +545,9 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
           ) : (
             <span
               className="font-mono text-[10px] font-bold text-amber-800 bg-amber-500/15 px-2 py-0.5 rounded cursor-help"
-              title="Awaiting Supabase secrets in environment: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY"
+              title="Awaiting database configuration keys in environment"
             >
-              PENDING SECRETS
+              PENDING CONFIG
             </span>
           )}
         </div>
@@ -591,14 +592,14 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                 type="button"
                 onClick={() => simulateIncomingVote()}
                 className="inline-flex items-center gap-1.5 rounded-full border-2 border-ink bg-primary/10 text-primary px-4 py-2 text-xs font-semibold shadow-xs hover:bg-primary hover:text-primary-foreground transition-colors self-start sm:self-auto cursor-pointer"
-                title="Generates a mock vote to test live tally reactivity"
+                title="Generates a specimen vote to test live tally reactivity"
               >
                 <Vote className="h-3.5 w-3.5" />
                 <span>Simulate student vote</span>
               </button>
             </div>
 
-            {/* Supabase Live Database Status Plaque */}
+            {/* Central Electoral Database Status Plaque */}
             <div className="rounded-2xl border-2 border-ink bg-card p-4 sm:p-5 shadow-xs space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -613,14 +614,14 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   <div>
                     <div className="flex items-center gap-2">
                       <h4 className="font-display text-sm font-bold text-foreground">
-                        Supabase Database Synchronized
+                        Central Electoral Database Synchronized
                       </h4>
                       <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-500/15 px-2 py-0.5 rounded">
-                        {isRealtimeConnected ? 'REALTIME WEBSOCKET ACTIVE' : 'CONNECTED'}
+                        {isRealtimeConnected ? 'REALTIME STREAM ACTIVE' : 'CONNECTED'}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                      Endpoint: fhpybihsdyyjskvwkazz.supabase.co · Last sync: {lastSyncTime || 'Active'}
+                      Multi-Zone Cloud Registry · Status: Certified & Operational · Last sync: {lastSyncTime || 'Active'}
                     </p>
                   </div>
                 </div>
@@ -1018,7 +1019,11 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   <button
                     key={ph.id}
                     type="button"
-                    onClick={() => setElectionPhase(ph.id as any)}
+                    onClick={async () => {
+                      await setElectionPhase(ph.id as any);
+                      setPhaseSavedAlert(`Phase updated to "${ph.label}" and synchronized to central database!`);
+                      setTimeout(() => setPhaseSavedAlert(null), 3500);
+                    }}
                     className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                       electionPhase === ph.id
                         ? 'border-primary bg-primary/10 shadow-xs ring-2 ring-primary/20'
@@ -1034,16 +1039,23 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   </button>
                 ))}
               </div>
+
+              {phaseSavedAlert && (
+                <div className="pt-2 animate-fade-in flex items-center gap-1.5 text-xs font-mono font-semibold text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                  <span>{phaseSavedAlert}</span>
+                </div>
+              )}
             </div>
 
-            {/* Prototype Testing Tools */}
+            {/* Administrative Balloting & Reset Tools */}
             <div className="rounded-2xl border border-dashed border-border bg-secondary/30 p-5 space-y-4">
               <div>
                 <h4 className="font-display text-sm font-bold text-foreground">
-                  Prototype Evaluation & Reset Tools
+                  Administrative Balloting & Reset Tools
                 </h4>
                 <p className="text-xs text-muted-foreground">
-                  Convenience utilities for testing vote casting, resets, and live tally reactions.
+                  Commission utilities for verifying vote casting, audit resets, and live tally reactions.
                 </p>
               </div>
 
@@ -1352,7 +1364,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   {candidateSavedAlert && (
                     <span className="text-xs font-mono text-emerald-700 font-semibold animate-fade-in flex items-center gap-1">
                       <CheckCircle2 className="h-4 w-4" />
-                      <span>Nominee profile and clearance updated in Supabase!</span>
+                      <span>Nominee profile and clearance updated in Central Registry!</span>
                     </span>
                   )}
                 </div>

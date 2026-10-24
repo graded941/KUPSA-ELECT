@@ -62,7 +62,6 @@ function getViewFromHash(): ViewId {
 
 function MainApp() {
   const [currentView, setCurrentView] = useState<ViewId>(getViewFromHash);
-  const [currentPhase, setCurrentPhase] = useState<ElectionPhase>('pre-election');
 
   // Modals state
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
@@ -91,7 +90,7 @@ function MainApp() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const { currentUser, announcementBanner, electionPhase } = useVotingStore();
+  const { currentUser, announcementBanner, electionPhase, setElectionPhase } = useVotingStore();
 
   // Dedicated focus mode for voting or commissioner portal (both have their own focused layout & sidebar)
   const isCustomLayout = (currentView === 'portal' && Boolean(currentUser)) || currentView === 'commissioner';
@@ -111,8 +110,8 @@ function MainApp() {
         <Navbar
           currentView={currentView}
           onNavigate={handleNavigate}
-          currentPhase={electionPhase || currentPhase}
-          onPhaseChange={setCurrentPhase}
+          currentPhase={electionPhase}
+          onPhaseChange={setElectionPhase}
         />
       )}
 
@@ -123,12 +122,12 @@ function MainApp() {
             onNavigate={handleNavigate}
             onOpenAudit={() => setIsAuditModalOpen(true)}
             onOpenRehearsal={() => setIsRehearsalOpen(true)}
-            currentPhase={currentPhase}
+            currentPhase={electionPhase}
           />
         )}
 
         {currentView === 'candidates' && (
-          <CandidatesView onNavigate={handleNavigate} currentPhase={currentPhase} />
+          <CandidatesView onNavigate={handleNavigate} currentPhase={electionPhase} />
         )}
 
         {currentView === 'auth' && (

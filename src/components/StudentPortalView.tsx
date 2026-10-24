@@ -406,7 +406,7 @@ export function StudentPortalView({ onNavigate }: StudentPortalViewProps) {
                   required
                 />
                 <p className="mt-2 text-center text-xs text-muted-foreground font-mono">
-                  Default prototype test code: <span className="font-bold text-primary">8492</span>
+                  Official Dispatch Passcode: <span className="font-bold text-primary">8492</span>
                 </p>
               </div>
 

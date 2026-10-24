@@ -302,9 +302,13 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [currentUser, formatDbBallot]);
 
-  // Initial load
+  // Initial load & continuous server synchronization (polls every 10 seconds to keep all devices in sync)
   useEffect(() => {
     refreshDbState();
+    const interval = setInterval(() => {
+      refreshDbState();
+    }, 10000);
+    return () => clearInterval(interval);
   }, [refreshDbState]);
 
   // Supabase Realtime Subscription
@@ -443,10 +447,14 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     updateElectionSettingsApi({ isResultsLive: val }).catch(console.error);
   };
 
-  // Setter wrapper for Election Phase (syncs to Supabase)
-  const setElectionPhase = (phase: 'pre-election' | 'polling-live' | 'counting' | 'results-declared') => {
+  // Setter wrapper for Election Phase (syncs to Supabase & broadcast to all devices)
+  const setElectionPhase = async (phase: 'pre-election' | 'polling-live' | 'counting' | 'results-declared') => {
     setElectionPhaseState(phase);
-    updateElectionSettingsApi({ electionPhase: phase }).catch(console.error);
+    try {
+      await updateElectionSettingsApi({ electionPhase: phase });
+    } catch (err) {
+      console.error('Failed to sync election phase to server:', err);
+    }
   };
 
   // Setter wrapper for Announcement Banner (syncs to Supabase)

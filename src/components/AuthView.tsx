@@ -645,7 +645,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                   {/* Demo Account Helper */}
                   <div className="pt-3 border-t border-border">
                     <p className="text-[11px] font-mono text-muted-foreground mb-2 text-center">
-                      Quick Prototype Testing Accounts:
+                      Accredited Demonstration Accounts:
                     </p>
                     <div className="flex flex-col gap-1.5">
                       <button

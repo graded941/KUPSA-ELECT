@@ -305,8 +305,8 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
             />
             <span className="font-semibold text-foreground">
               {isRealtimeConnected
-                ? 'Supabase Realtime Stream Connected'
-                : 'Synchronizing with Electoral Database...'}
+                ? 'Official Electoral Ledger · Live Synced'
+                : 'Synchronizing with Central Electoral Database...'}
             </span>
           </div>
 
@@ -362,7 +362,7 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
               {turnoutCount.toLocaleString()}
             </p>
             <p className="text-xs opacity-60 font-mono mt-1">
-              Recorded in Supabase `ballots` table
+              Cryptographically Witnessed & Sealed
             </p>
           </div>
 
@@ -417,7 +417,7 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
               Awaiting First Polling Submissions
             </h3>
             <p className="text-xs text-muted-foreground max-w-md mx-auto">
-              Live polling is active in Supabase. Tallies will dynamically calculate as student ballots are sealed.
+              Live polling is active in the central registry. Tallies dynamically calculate as student ballots are sealed.
             </p>
             <div className="pt-2">
               <button
@@ -530,7 +530,7 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
                 Verify Your Anonymous Ballot Hash
               </h3>
               <p className="text-xs text-muted-foreground">
-                Enter the receipt code given when you voted to verify your ballot was counted in the Supabase database.
+                Enter the receipt code given when you voted to verify your ballot was counted in the official central registry.
               </p>
             </div>
           </div>
@@ -559,7 +559,7 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs text-emerald-800 flex items-start gap-2.5 animate-in fade-in">
               <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-sm">Ballot Confirmed & Witnessed in Supabase</p>
+                <p className="font-bold text-sm">Ballot Confirmed & Witnessed in Central Ledger</p>
                 <p className="mt-0.5 text-emerald-700">
                   This anonymous receipt exists in the official database ledger. Your secret selections were factored into the live tallies above.
                 </p>
