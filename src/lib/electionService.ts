@@ -488,3 +488,61 @@ export async function dispatchNoticeEmail(payload: {
   }
 }
 
+export interface ApiHealthReport {
+  status: string;
+  timestamp: string;
+  latencyMs: number;
+  service: string;
+  database: {
+    status: string;
+    url: string;
+    error: string | null;
+  };
+  smtp: {
+    configured: boolean;
+    user: string | null;
+    host: string | null;
+    port: number | null;
+    hasPassword: boolean;
+  };
+  runtime: {
+    node: string;
+    platform: string;
+    isVercel: boolean;
+    siteUrl: string;
+  };
+}
+
+export async function fetchApiHealth(): Promise<ApiHealthReport> {
+  try {
+    const res = await fetch('/api/health');
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    return await res.json();
+  } catch (err: any) {
+    return {
+      status: 'unreachable',
+      timestamp: new Date().toISOString(),
+      latencyMs: 0,
+      service: 'KUPSA API (Static Fallback Active)',
+      database: {
+        status: isSupabaseConfigured() ? 'connected_client' : 'missing',
+        url: 'client_supabase',
+        error: err.message,
+      },
+      smtp: {
+        configured: false,
+        user: null,
+        host: null,
+        port: null,
+        hasPassword: false,
+      },
+      runtime: {
+        node: 'unknown',
+        platform: 'browser',
+        isVercel: true,
+        siteUrl: typeof window !== 'undefined' ? window.location.origin : 'https://kupsaelect.vercel.app',
+      },
+    };
+  }
+}
+

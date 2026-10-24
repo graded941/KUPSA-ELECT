@@ -793,8 +793,57 @@ function balloutDeleteError(err: any): boolean {
 }
 
 // ==========================================
-// KUPSA RESILIENT EMAIL OUTBOX DISPATCH APIS
+// KUPSA SYSTEM HEALTH & OUTBOX DISPATCH APIS
 // ==========================================
+
+// Complete API & System Health Check
+app.get(['/api/health', '/api/ping'], async (_req: Request, res: Response) => {
+  const startTime = Date.now();
+  let dbStatus = 'disconnected';
+  let dbError: string | null = null;
+
+  if (supabaseAdmin) {
+    try {
+      const { error } = await supabaseAdmin.from('election_settings').select('id').limit(1).maybeSingle();
+      if (!error) {
+        dbStatus = 'connected';
+      } else {
+        dbStatus = 'error';
+        dbError = error.message;
+      }
+    } catch (e: any) {
+      dbStatus = 'error';
+      dbError = e.message;
+    }
+  }
+
+  const smtpInfo = NotificationOutbox.getSmtpStatus();
+
+  return res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    latencyMs: Date.now() - startTime,
+    service: 'KUPSA Independent Electoral Commission API',
+    database: {
+      status: dbStatus,
+      url: supabaseUrl || 'not_configured',
+      error: dbError,
+    },
+    smtp: {
+      configured: smtpInfo.configured,
+      user: smtpInfo.user || null,
+      host: smtpInfo.host || null,
+      port: smtpInfo.port || null,
+      hasPassword: Boolean(process.env.SMTP_PASS?.trim()),
+    },
+    runtime: {
+      node: process.version,
+      platform: process.platform,
+      isVercel: Boolean(process.env.VERCEL),
+      siteUrl: process.env.SITE_URL || 'https://kupsaelect.vercel.app',
+    },
+  });
+});
 
 // Diagnostic SMTP status check
 app.get('/api/email/status', async (_req: Request, res: Response) => {
@@ -940,6 +989,10 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error('Failed to start server:', err);
-});
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error('Failed to start server:', err);
+  });
+}
+
+export default app;

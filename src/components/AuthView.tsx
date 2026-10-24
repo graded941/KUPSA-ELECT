@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useGmail } from '../context/GmailContext';
 import { GoogleSignInButton } from './GoogleSignInButton';
+import { dispatchVoterPassEmail } from '../lib/electionService';
 
 interface AuthViewProps {
   onNavigate: (view: ViewId) => void;
@@ -115,24 +116,45 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
     setShowInboxConfirm(true);
     setResendCooldown(60);
 
-    // If Gmail is connected, dispatch live email via official Gmail API
-    if (isGmailConnected && res.password) {
+    // Autonomous passcard dispatch via SMTP server (verve.n.co.ke@gmail.com)
+    if (res.password) {
+      const generatedPassword = res.password;
       setGmailDeliveryStatus('sending');
-      sendPasswordEmail({
+      const randomReg = `PHARM/2026/${Math.floor(1000 + Math.random() * 9000)}`;
+
+      dispatchVoterPassEmail({
         studentName: fullName.trim(),
-        recipientEmail: cleanEmail,
-        password: res.password,
+        regNo: randomReg,
         yearOfStudy,
-      }).then((result) => {
-        if (result.success) {
-          setGmailDeliveryStatus('sent');
-          setGmailMsgId(result.messageId || 'sent');
-        } else {
+        email: cleanEmail,
+        passwordCode: generatedPassword,
+        pollingStation: 'School of Pharmacy Complex, Kabarak University',
+      })
+        .then((result) => {
+          if (result.success) {
+            setGmailDeliveryStatus('sent');
+            setGmailMsgId(result.messageId || result.outboxId || 'sent');
+          } else if (isGmailConnected) {
+            sendPasswordEmail({
+              studentName: fullName.trim(),
+              recipientEmail: cleanEmail,
+              password: generatedPassword,
+              yearOfStudy,
+            }).then((oauthRes) => {
+              if (oauthRes.success) {
+                setGmailDeliveryStatus('sent');
+                setGmailMsgId(oauthRes.messageId || 'sent');
+              } else {
+                setGmailDeliveryStatus('fallback');
+              }
+            });
+          } else {
+            setGmailDeliveryStatus('fallback');
+          }
+        })
+        .catch(() => {
           setGmailDeliveryStatus('fallback');
-        }
-      }).catch(() => {
-        setGmailDeliveryStatus('fallback');
-      });
+        });
     } else {
       setGmailDeliveryStatus('fallback');
     }
@@ -177,18 +199,40 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
     resendEmail(registeredEmail);
     setResendCooldown(60);
 
-    if (isGmailConnected && simulatedEmail) {
+    if (simulatedEmail) {
       setGmailDeliveryStatus('sending');
-      sendPasswordEmail({
+      const randomReg = `PHARM/2026/${Math.floor(1000 + Math.random() * 9000)}`;
+
+      dispatchVoterPassEmail({
         studentName: simulatedEmail.recipientName,
-        recipientEmail: registeredEmail,
-        password: simulatedEmail.password,
+        regNo: randomReg,
         yearOfStudy: 'Year 3',
+        email: registeredEmail,
+        passwordCode: simulatedEmail.password,
+        pollingStation: 'School of Pharmacy Complex, Kabarak University',
       }).then((result) => {
         if (result.success) {
           setGmailDeliveryStatus('sent');
-          setGmailMsgId(result.messageId || 'sent');
+          setGmailMsgId(result.messageId || result.outboxId || 'sent');
+        } else if (isGmailConnected) {
+          sendPasswordEmail({
+            studentName: simulatedEmail.recipientName,
+            recipientEmail: registeredEmail,
+            password: simulatedEmail.password,
+            yearOfStudy: 'Year 3',
+          }).then((oauthRes) => {
+            if (oauthRes.success) {
+              setGmailDeliveryStatus('sent');
+              setGmailMsgId(oauthRes.messageId || 'sent');
+            } else {
+              setGmailDeliveryStatus('fallback');
+            }
+          });
+        } else {
+          setGmailDeliveryStatus('fallback');
         }
+      }).catch(() => {
+        setGmailDeliveryStatus('fallback');
       });
     }
   };
@@ -268,16 +312,16 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                 </p>
               </div>
 
-              {/* Gmail Delivery Status Badge */}
+              {/* Delivery Status Badge */}
               {gmailDeliveryStatus === 'sent' ? (
                 <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-xs space-y-2">
                   <div className="flex items-center gap-2 font-bold text-emerald-800">
                     <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span>Official Email Dispatched via Google Gmail</span>
+                    <span>Official Passcard Sent from verve.n.co.ke@gmail.com</span>
                   </div>
                   <p className="text-[11px] text-emerald-700 leading-relaxed">
-                    A branded access pass with your secret password has been transmitted directly to{' '}
-                    <strong className="font-mono">{registeredEmail}</strong> using the Electoral Commission's Gmail account.
+                    A branded access pass with your secret password, vector PDF passcard, inline QR check-in code, and election calendar invite has been dispatched to{' '}
+                    <strong className="font-mono">{registeredEmail}</strong>.
                   </p>
                   <div className="pt-1">
                     <a
@@ -286,7 +330,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 hover:underline"
                     >
-                      <span>Open Kabarak Gmail Webmail</span>
+                      <span>Open Gmail Inbox</span>
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   </div>
@@ -294,7 +338,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
               ) : gmailDeliveryStatus === 'sending' ? (
                 <div className="rounded-2xl border border-primary/40 bg-primary/10 p-4 text-xs flex items-center gap-2.5 text-primary">
                   <RefreshCw className="h-4 w-4 animate-spin shrink-0" />
-                  <span className="font-medium">Transmitting passcard through Google Gmail API...</span>
+                  <span className="font-medium">Transmitting passcard through SMTP engine (verve.n.co.ke@gmail.com)...</span>
                 </div>
               ) : null}
 
@@ -302,16 +346,14 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-foreground font-semibold">
                     <Sparkles className="h-4 w-4 text-primary" />
-                    <span>Instant Prototype Passcard Inspection</span>
+                    <span>Instant Passcard & Password Inspection</span>
                   </div>
-                  {isGmailConnected && (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-bold">
-                      GMAIL SYNC ACTIVE
-                    </span>
-                  )}
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-bold">
+                    ACTIVE
+                  </span>
                 </div>
                 <p>
-                  You can inspect the exact branded email and copy your credentials right now in the simulated view:
+                  You can inspect the exact passcard and copy your credentials right now:
                 </p>
                 <div className="pt-2">
                   <button
@@ -320,22 +362,9 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                     className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-xs font-semibold text-ink-foreground shadow-xs hover:bg-primary transition-colors cursor-pointer"
                   >
                     <Inbox className="h-4 w-4" />
-                    <span>Open simulated email</span>
+                    <span>Open passcard credentials view</span>
                   </button>
                 </div>
-
-                {!isGmailConnected && (
-                  <div className="pt-2 border-t border-border/60 flex items-center justify-between text-[11px]">
-                    <span className="text-muted-foreground">Want live SMTP email dispatch?</span>
-                    <button
-                      type="button"
-                      onClick={connectGmail}
-                      className="text-primary font-bold hover:underline cursor-pointer"
-                    >
-                      Connect Gmail →
-                    </button>
-                  </div>
-                )}
               </div>
 
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs">
