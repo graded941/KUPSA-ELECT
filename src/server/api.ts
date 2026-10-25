@@ -336,6 +336,42 @@ const INITIAL_VOTERS = [
 ];
 
 // ==========================================
+// RESILIENT IN-MEMORY STORE (Seamless fallback if Supabase URL is not configured)
+// ==========================================
+interface ElectionSettingsState {
+  id?: number;
+  is_results_live: boolean;
+  election_phase: 'pre-election' | 'polling-live' | 'counting' | 'results-declared';
+  announcement_banner: string;
+  updated_at?: string;
+}
+
+let inMemorySettings: ElectionSettingsState = {
+  id: 1,
+  is_results_live: false,
+  election_phase: 'polling-live',
+  announcement_banner: 'Official Notice: General Polling in session under Chapter Six statutory authority.',
+  updated_at: new Date().toISOString(),
+};
+
+let inMemoryOffices = [...INITIAL_OFFICES];
+let inMemoryCandidates = [...INITIAL_CANDIDATES];
+let inMemoryVoters = INITIAL_VOTERS.map((v) => ({
+  id: `voter-${v.regNo.replace(/\//g, '-')}`,
+  reg_no: v.regNo,
+  email: v.email.toLowerCase(),
+  full_name: v.name,
+  year_of_study: v.yearOfStudy,
+  accreditation_status: v.status,
+  has_voted: v.hasVoted,
+  voted_at: null as string | null,
+  receipt_code: null as string | null,
+  created_at: new Date().toISOString(),
+}));
+let inMemoryBallots: any[] = [];
+let inMemoryAuditLogs: any[] = [];
+
+// ==========================================
 // SYSTEM HEALTH & DIAGNOSTICS ENDPOINTS
 // ==========================================
 
@@ -358,12 +394,12 @@ app.get(['/api/health', '/api/ping'], async (_req: Request, res: Response) => {
 
       dbStatus = 'connected';
       counts = {
-        settings: settingsRes.count ?? settingsRes.data?.length ?? 0,
-        offices: officesRes.count ?? officesRes.data?.length ?? 0,
-        candidates: candsRes.count ?? candsRes.data?.length ?? 0,
-        voters: votersRes.count ?? votersRes.data?.length ?? 0,
-        ballots: ballotsRes.count ?? ballotsRes.data?.length ?? 0,
-        auditLogs: auditRes.count ?? auditRes.data?.length ?? 0,
+        settings: settingsRes.count ?? settingsRes.data?.length ?? 1,
+        offices: officesRes.count ?? officesRes.data?.length ?? inMemoryOffices.length,
+        candidates: candsRes.count ?? candsRes.data?.length ?? inMemoryCandidates.length,
+        voters: votersRes.count ?? votersRes.data?.length ?? inMemoryVoters.length,
+        ballots: ballotsRes.count ?? ballotsRes.data?.length ?? inMemoryBallots.length,
+        auditLogs: auditRes.count ?? auditRes.data?.length ?? inMemoryAuditLogs.length,
       };
     } catch (e: any) {
       dbStatus = 'degraded';
@@ -385,12 +421,12 @@ app.get(['/api/health', '/api/ping'], async (_req: Request, res: Response) => {
       error: dbError,
     },
     counts: counts || {
-      settings: 0,
-      offices: 0,
-      candidates: 0,
-      voters: 0,
-      ballots: 0,
-      auditLogs: 0,
+      settings: 1,
+      offices: inMemoryOffices.length,
+      candidates: inMemoryCandidates.length,
+      voters: inMemoryVoters.length,
+      ballots: inMemoryBallots.length,
+      auditLogs: inMemoryAuditLogs.length,
     },
     smtp: {
       configured: smtpInfo.configured,
@@ -410,39 +446,158 @@ app.get(['/api/health', '/api/ping'], async (_req: Request, res: Response) => {
 
 // Full Election State Retrieval (Atomic snapshot)
 app.get('/api/election/state', async (_req: Request, res: Response) => {
-  if (!supabaseAdmin) {
-    return res.status(503).json({ error: 'Supabase database not configured' });
+  if (supabaseAdmin) {
+    try {
+      const [settingsRes, officesRes, candsRes, votersRes, ballotsRes] = await Promise.all([
+        supabaseAdmin.from('election_settings').select('*').limit(1).maybeSingle(),
+        supabaseAdmin.from('offices').select('*').order('display_order', { ascending: true }),
+        supabaseAdmin.from('candidates').select('*').order('created_at', { ascending: true }),
+        supabaseAdmin.from('voters').select('*').order('full_name', { ascending: true }),
+        supabaseAdmin.from('ballots').select('*').order('created_at', { ascending: false }),
+      ]);
+
+      if (settingsRes.data) inMemorySettings = { ...inMemorySettings, ...settingsRes.data };
+      if (officesRes.data && officesRes.data.length > 0) inMemoryOffices = officesRes.data;
+      if (candsRes.data && candsRes.data.length > 0) inMemoryCandidates = candsRes.data;
+      if (votersRes.data && votersRes.data.length > 0) inMemoryVoters = votersRes.data;
+      if (ballotsRes.data) inMemoryBallots = ballotsRes.data;
+    } catch (err: any) {
+      console.warn('Error fetching election state from Supabase, serving in-memory snapshot:', err.message);
+    }
   }
 
-  try {
-    const [settingsRes, officesRes, candsRes, votersRes, ballotsRes] = await Promise.all([
-      supabaseAdmin.from('election_settings').select('*').limit(1).maybeSingle(),
-      supabaseAdmin.from('offices').select('*').order('display_order', { ascending: true }),
-      supabaseAdmin.from('candidates').select('*').order('created_at', { ascending: true }),
-      supabaseAdmin.from('voters').select('*').order('full_name', { ascending: true }),
-      supabaseAdmin.from('ballots').select('*').order('created_at', { ascending: false }),
-    ]);
-
-    return res.json({
-      settings: settingsRes.data || {
-        is_results_live: false,
-        election_phase: 'polling-live',
-        announcement_banner: '',
-      },
-      offices: officesRes.data || [],
-      candidates: candsRes.data || [],
-      voters: votersRes.data || [],
-      ballots: ballotsRes.data || [],
-    });
-  } catch (err: any) {
-    console.error('Error fetching election state:', err);
-    return res.status(500).json({ error: err.message });
-  }
+  return res.json({
+    settings: inMemorySettings,
+    offices: inMemoryOffices,
+    candidates: inMemoryCandidates,
+    voters: inMemoryVoters,
+    ballots: inMemoryBallots,
+  });
 });
 
 // Helper: Ensure a voter row exists in public.voters while satisfying the foreign key constraint to auth.users
 async function ensureVoterRecord(
   email: string,
+  fullName?: string,
+  yearOfStudy?: string,
+  initialPassword?: string
+): Promise<any> {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail.endsWith('@kabarak.ac.ke')) return null;
+
+  // 1. Check existing in-memory / cache
+  const cached = voterPinStore.get(cleanEmail);
+  const existingInMemory = inMemoryVoters.find((v) => v.email.toLowerCase() === cleanEmail);
+
+  if (supabaseAdmin) {
+    try {
+      const { data: existing } = await supabaseAdmin
+        .from('voters')
+        .select('*')
+        .ilike('email', cleanEmail)
+        .maybeSingle();
+
+      if (existing) {
+        return {
+          ...existing,
+          generatedPassword: cached?.pin || initialPassword,
+        };
+      }
+    } catch (e) {
+      console.warn('Supabase voter lookup warning:', e);
+    }
+  } else if (existingInMemory) {
+    return {
+      ...existingInMemory,
+      generatedPassword: cached?.pin || initialPassword,
+    };
+  }
+
+  // 2. Generate Cryptographic 6-Digit PIN
+  const randomPin = crypto.randomInt(100000, 1000000);
+  const generatedPassword = initialPassword || `KUP-${randomPin}`;
+  const regSuffix = Math.floor(1000 + Math.random() * 9000);
+  const regNo = `PHARM/2026/${regSuffix}`;
+  const studentName = (fullName || cleanEmail.split('@')[0].replace(/[._-]/g, ' ')).replace(/\b\w/g, (c) => c.toUpperCase());
+
+  let authUserId: string = `voter-${regNo.replace(/\//g, '-')}`;
+
+  if (supabaseAdmin) {
+    try {
+      const { data: authUser } = await supabaseAdmin.auth.admin.createUser({
+        email: cleanEmail,
+        password: generatedPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: studentName,
+          year_of_study: yearOfStudy || 'Year 3',
+          reg_no: regNo,
+          pin: generatedPassword,
+        },
+      });
+      if (authUser?.user?.id) {
+        authUserId = authUser.user.id;
+      }
+    } catch (_e) {
+      // User may already exist in auth.users
+    }
+
+    try {
+      const { data: insertedVoter } = await supabaseAdmin
+        .from('voters')
+        .upsert({
+          id: authUserId,
+          reg_no: regNo,
+          email: cleanEmail,
+          full_name: studentName,
+          year_of_study: yearOfStudy || 'Year 3',
+          accreditation_status: 'Eligible',
+          has_voted: false,
+        }, { onConflict: 'id' })
+        .select()
+        .maybeSingle();
+
+      if (insertedVoter) {
+        authUserId = insertedVoter.id;
+      }
+    } catch (insErr) {
+      console.warn('Supabase voter insert notice:', insErr);
+    }
+  }
+
+  const finalVoter = {
+    id: authUserId,
+    reg_no: regNo,
+    email: cleanEmail,
+    full_name: studentName,
+    year_of_study: yearOfStudy || 'Year 3',
+    accreditation_status: 'Eligible',
+    has_voted: false,
+    voted_at: null,
+    receipt_code: null,
+    created_at: new Date().toISOString(),
+  };
+
+  // Sync to in-memory voters
+  const existingIdx = inMemoryVoters.findIndex((v) => v.email.toLowerCase() === cleanEmail);
+  if (existingIdx >= 0) {
+    inMemoryVoters[existingIdx] = finalVoter;
+  } else {
+    inMemoryVoters.push(finalVoter);
+  }
+
+  voterPinStore.set(cleanEmail, {
+    pin: generatedPassword,
+    regNo: finalVoter.reg_no,
+    name: finalVoter.full_name,
+    yearOfStudy: finalVoter.year_of_study,
+  });
+
+  return {
+    ...finalVoter,
+    generatedPassword,
+  };
+}
   fullName?: string,
   yearOfStudy?: string,
   initialPassword?: string

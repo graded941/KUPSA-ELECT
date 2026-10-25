@@ -11,7 +11,6 @@ import {
   Lock,
   LogOut,
   ArrowRight,
-  Vote,
   CheckCircle2,
   AlertTriangle,
   Search,
@@ -24,7 +23,6 @@ import {
   FileText,
   Clock,
   Layers,
-  Sparkles,
   Key,
   Mail,
   Send,
@@ -55,21 +53,17 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
     accreditationList,
     toggleAccreditation,
     resetUserVoteStatus,
-    simulateIncomingVote,
     resetVotesToSeed,
     isLoadingDb,
     dbError,
     isRealtimeConnected,
     lastSyncTime,
     refreshDbState,
-    seedOfficialRoster,
     resetAllBallots,
     dbOffices,
     dbCandidates,
   } = useVotingStore();
 
-  const [isSeeding, setIsSeeding] = useState(false);
-  const [seedSuccessMessage, setSeedSuccessMessage] = useState<string | null>(null);
   const [isResettingBallots, setIsResettingBallots] = useState(false);
   const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
 
@@ -95,7 +89,6 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
   // Form states for editable changes
   const [editingBanner, setEditingBanner] = useState(announcementBanner);
   const [bannerSavedAlert, setBannerSavedAlert] = useState(false);
-  const [phaseSavedAlert, setPhaseSavedAlert] = useState<string | null>(null);
 
   // Voter roll search & filters
   const [voterSearch, setVoterSearch] = useState('');
@@ -934,97 +927,15 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
               </form>
             </div>
 
-            {/* Statutory Phase Selector */}
-            <div className="rounded-3xl border-2 border-border bg-card p-6 shadow-xs space-y-4">
-              <div>
-                <h3 className="font-display text-lg font-bold text-foreground">
-                  Statutory Election Phase
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Controls the constitutional timeline badges, countdown timers, and ballot openness states.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { id: 'pre-election', label: '1. Pre-Election', desc: 'Vetting & voter inspection' },
-                  { id: 'polling-live', label: '2. Polling Live', desc: 'Active ballot voting open' },
-                  { id: 'counting', label: '3. Counting', desc: 'Agent tallying in progress' },
-                  { id: 'results-declared', label: '4. Gazetted', desc: 'Official winners declared' },
-                ].map((ph) => (
-                  <button
-                    key={ph.id}
-                    type="button"
-                    onClick={async () => {
-                      await setElectionPhase(ph.id as any);
-                      setPhaseSavedAlert(`Phase updated to "${ph.label}" and synchronized to central database!`);
-                      setTimeout(() => setPhaseSavedAlert(null), 3500);
-                    }}
-                    className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer ${
-                      electionPhase === ph.id
-                        ? 'border-primary bg-primary/10 shadow-xs ring-2 ring-primary/20'
-                        : 'border-border bg-background hover:border-ink'
-                    }`}
-                  >
-                    <span className="font-display text-xs font-bold text-foreground block">
-                      {ph.label}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground mt-0.5 block">
-                      {ph.desc}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              {phaseSavedAlert && (
-                <div className="pt-2 animate-fade-in flex items-center gap-1.5 text-xs font-mono font-semibold text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                  <span>{phaseSavedAlert}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Administrative Balloting & Reset Tools */}
-            <div className="rounded-2xl border border-dashed border-border bg-secondary/30 p-5 space-y-4">
+            {/* Reset Tools */}
+            <div className="rounded-2xl border border-dashed border-border bg-secondary/30 p-5 space-y-3">
               <div>
                 <h4 className="font-display text-sm font-bold text-foreground">
-                  Administrative Balloting & Reset Tools
+                  Reset Tools
                 </h4>
-                <p className="text-xs text-muted-foreground">
-                  Commission utilities for verifying vote casting, audit resets, and live tally reactions.
-                </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => simulateIncomingVote()}
-                  className="rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <Vote className="h-3.5 w-3.5 text-primary" />
-                  <span>Simulate 1 Student Vote</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setIsSeeding(true);
-                    try {
-                      const res = await seedOfficialRoster();
-                      alert(res.message);
-                    } catch (e: any) {
-                      alert(e.message);
-                    } finally {
-                      setIsSeeding(false);
-                    }
-                  }}
-                  disabled={isSeeding}
-                  className="rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-mono text-foreground hover:bg-secondary transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <Sparkles className="h-3.5 w-3.5 text-primary" />
-                  <span>{isSeeding ? 'Seeding...' : 'Seed Official 2026/2027 Roster to DB'}</span>
-                </button>
-
                 <button
                   type="button"
                   onClick={async () => {
