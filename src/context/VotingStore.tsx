@@ -143,8 +143,8 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [votes, setVotes] = useState<CastVote[]>([]);
   const [lastCastVote, setLastCastVote] = useState<CastVote | null>(null);
 
-  // Settings
-  const [isResultsLive, setIsResultsLiveState] = useState<boolean>(true);
+  // Settings (Default isResultsLive is false / embargoed until toggled live by commission)
+  const [isResultsLive, setIsResultsLiveState] = useState<boolean>(false);
   const [electionPhase, setElectionPhaseState] = useState<'pre-election' | 'polling-live' | 'counting' | 'results-declared'>('polling-live');
   const [announcementBanner, setAnnouncementBannerState] = useState<string>('');
 
@@ -230,14 +230,14 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       const state = await fetchLiveElectionState();
 
-      // 1. Settings
+      // 1. Settings (strictly respects database value, defaults to false)
       if (state.settings) {
-        setIsResultsLiveState(state.settings.is_results_live ?? true);
+        setIsResultsLiveState(Boolean(state.settings.is_results_live));
         if (state.settings.election_phase) {
           setElectionPhaseState(state.settings.election_phase);
         }
-        if (state.settings.announcement_banner) {
-          setAnnouncementBannerState(state.settings.announcement_banner);
+        if (state.settings.announcement_banner !== undefined) {
+          setAnnouncementBannerState(state.settings.announcement_banner || '');
         }
       }
 
@@ -302,12 +302,12 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [currentUser, formatDbBallot]);
 
-  // Initial load & continuous server synchronization (polls every 10 seconds to keep all devices in sync)
+  // Initial load & continuous server synchronization (polls every 4 seconds to keep all devices in sync across clients)
   useEffect(() => {
     refreshDbState();
     const interval = setInterval(() => {
       refreshDbState();
-    }, 10000);
+    }, 4000);
     return () => clearInterval(interval);
   }, [refreshDbState]);
 
@@ -441,10 +441,15 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
-  // Setter wrapper for Results Live (syncs to Supabase)
-  const setIsResultsLive = (val: boolean) => {
+  // Setter wrapper for Results Live (syncs centrally to Supabase database for all devices)
+  const setIsResultsLive = async (val: boolean) => {
     setIsResultsLiveState(val);
-    updateElectionSettingsApi({ isResultsLive: val }).catch(console.error);
+    try {
+      await updateElectionSettingsApi({ isResultsLive: val });
+      await refreshDbState();
+    } catch (err) {
+      console.error('Failed to sync isResultsLive to Supabase:', err);
+    }
   };
 
   // Setter wrapper for Election Phase (syncs to Supabase & broadcast to all devices)
@@ -452,15 +457,21 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setElectionPhaseState(phase);
     try {
       await updateElectionSettingsApi({ electionPhase: phase });
+      await refreshDbState();
     } catch (err) {
       console.error('Failed to sync election phase to server:', err);
     }
   };
 
   // Setter wrapper for Announcement Banner (syncs to Supabase)
-  const setAnnouncementBanner = (text: string) => {
+  const setAnnouncementBanner = async (text: string) => {
     setAnnouncementBannerState(text);
-    updateElectionSettingsApi({ announcementBanner: text }).catch(console.error);
+    try {
+      await updateElectionSettingsApi({ announcementBanner: text });
+      await refreshDbState();
+    } catch (err) {
+      console.error('Failed to sync announcement banner to server:', err);
+    }
   };
 
   // Candidate clearance & profile update (syncs to Supabase)

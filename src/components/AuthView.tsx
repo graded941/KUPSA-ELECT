@@ -19,8 +19,6 @@ import {
   Inbox,
   ExternalLink
 } from 'lucide-react';
-import { useGmail } from '../context/GmailContext';
-import { GoogleSignInButton } from './GoogleSignInButton';
 import { dispatchVoterPassEmail } from '../lib/electionService';
 
 interface AuthViewProps {
@@ -30,7 +28,6 @@ interface AuthViewProps {
 
 export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) {
   const { signUp, login, currentUser, getSimulatedEmail, resendEmail } = useVotingStore();
-  const { isGmailConnected, googleUser, connectGmail, isConnecting, sendPasswordEmail } = useGmail();
 
   const [mode, setMode] = useState<'login' | 'signup'>(defaultMode);
   const [gmailDeliveryStatus, setGmailDeliveryStatus] = useState<'idle' | 'sending' | 'sent' | 'fallback'>('idle');
@@ -46,8 +43,6 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
   // Inbox confirmation state
   const [showInboxConfirm, setShowInboxConfirm] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
-  const [showSimulatedEmailModal, setShowSimulatedEmailModal] = useState(false);
-  const [copiedPassword, setCopiedPassword] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
 
   // Log in state
@@ -134,20 +129,6 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
           if (result.success) {
             setGmailDeliveryStatus('sent');
             setGmailMsgId(result.messageId || result.outboxId || 'sent');
-          } else if (isGmailConnected) {
-            sendPasswordEmail({
-              studentName: fullName.trim(),
-              recipientEmail: cleanEmail,
-              password: generatedPassword,
-              yearOfStudy,
-            }).then((oauthRes) => {
-              if (oauthRes.success) {
-                setGmailDeliveryStatus('sent');
-                setGmailMsgId(oauthRes.messageId || 'sent');
-              } else {
-                setGmailDeliveryStatus('fallback');
-              }
-            });
           } else {
             setGmailDeliveryStatus('fallback');
           }
@@ -188,12 +169,6 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
     onNavigate('portal');
   };
 
-  const handleCopyPassword = (pwd: string) => {
-    navigator.clipboard.writeText(pwd);
-    setCopiedPassword(true);
-    setTimeout(() => setCopiedPassword(false), 2000);
-  };
-
   const handleResend = () => {
     if (resendCooldown > 0) return;
     resendEmail(registeredEmail);
@@ -214,20 +189,6 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
         if (result.success) {
           setGmailDeliveryStatus('sent');
           setGmailMsgId(result.messageId || result.outboxId || 'sent');
-        } else if (isGmailConnected) {
-          sendPasswordEmail({
-            studentName: simulatedEmail.recipientName,
-            recipientEmail: registeredEmail,
-            password: simulatedEmail.password,
-            yearOfStudy: 'Year 3',
-          }).then((oauthRes) => {
-            if (oauthRes.success) {
-              setGmailDeliveryStatus('sent');
-              setGmailMsgId(oauthRes.messageId || 'sent');
-            } else {
-              setGmailDeliveryStatus('fallback');
-            }
-          });
         } else {
           setGmailDeliveryStatus('fallback');
         }
@@ -297,106 +258,139 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
           {showInboxConfirm ? (
             /* Check Your Inbox Screen */
             <div className="max-w-md mx-auto w-full space-y-6 animate-in fade-in duration-300">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <Mail className="h-7 w-7" />
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-ink text-sun border border-white/10 shadow-xs">
+                  <Mail className="h-7 w-7" />
+                </div>
+                <div>
+                  <span className="eyebrow text-primary">Registration Confirmed</span>
+                  <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
+                    Check your student inbox
+                  </h2>
+                </div>
               </div>
 
-              <div>
-                <span className="eyebrow text-primary">Account Created</span>
-                <h2 className="mt-1 font-display text-3xl font-semibold text-foreground">
-                  Check your inbox
-                </h2>
-                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                  We have sent your secure voter password to{' '}
-                  <strong className="text-foreground font-mono font-medium">{registeredEmail}</strong>.
-                </p>
-              </div>
-
-              {/* Delivery Status Badge */}
+              {/* Delivery Status Plaque */}
               {gmailDeliveryStatus === 'sent' ? (
-                <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-xs space-y-2">
-                  <div className="flex items-center gap-2 font-bold text-emerald-800">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span>Official Passcard Sent from verve.n.co.ke@gmail.com</span>
+                <div className="rounded-2xl border-2 border-emerald-600/30 bg-emerald-500/10 p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-xs text-emerald-900 dark:text-emerald-300">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>Official Passcard Dispatched</span>
+                    </div>
+                    <span className="font-mono text-[10px] font-bold text-emerald-800 bg-emerald-500/20 px-2 py-0.5 rounded">
+                      DELIVERED
+                    </span>
                   </div>
-                  <p className="text-[11px] text-emerald-700 leading-relaxed">
-                    A branded access pass with your secret password, vector PDF passcard, inline QR check-in code, and election calendar invite has been dispatched to{' '}
-                    <strong className="font-mono">{registeredEmail}</strong>.
+                  <p className="text-xs text-emerald-800 dark:text-emerald-200 leading-relaxed">
+                    Your single-token voter password, PDF passcard, and polling calendar reminder have been sent to{' '}
+                    <strong className="font-mono underline">{registeredEmail}</strong>.
                   </p>
-                  <div className="pt-1">
-                    <a
-                      href="https://mail.google.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 hover:underline"
-                    >
-                      <span>Open Gmail Inbox</span>
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
+                  {gmailMsgId && (
+                    <div className="pt-1 flex items-center justify-between text-[10px] font-mono text-emerald-700/80 border-t border-emerald-500/20">
+                      <span>Dispatch Reference:</span>
+                      <span className="font-bold truncate max-w-[200px]">{gmailMsgId}</span>
+                    </div>
+                  )}
                 </div>
               ) : gmailDeliveryStatus === 'sending' ? (
-                <div className="rounded-2xl border border-primary/40 bg-primary/10 p-4 text-xs flex items-center gap-2.5 text-primary">
-                  <RefreshCw className="h-4 w-4 animate-spin shrink-0" />
-                  <span className="font-medium">Transmitting passcard through SMTP engine (verve.n.co.ke@gmail.com)...</span>
-                </div>
-              ) : null}
-
-              <div className="rounded-2xl border border-border bg-secondary/50 p-4 space-y-2 text-xs text-muted-foreground">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-foreground font-semibold">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <span>Instant Passcard & Password Inspection</span>
+                <div className="rounded-2xl border border-primary/40 bg-primary/10 p-5 space-y-2">
+                  <div className="flex items-center gap-2 text-primary font-bold text-xs">
+                    <RefreshCw className="h-4 w-4 animate-spin shrink-0" />
+                    <span>Dispatching credentials to your inbox...</span>
                   </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-bold">
-                    ACTIVE
-                  </span>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Connecting to institutional mail server (<span className="font-mono">verve.n.co.ke@gmail.com</span>) to transmit your sealed voter passcard.
+                  </p>
                 </div>
-                <p>
-                  You can inspect the exact passcard and copy your credentials right now:
-                </p>
-                <div className="pt-2">
+              ) : (
+                <div className="rounded-2xl border border-border bg-secondary/60 p-4 space-y-1.5 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 font-semibold text-foreground">
+                    <ShieldCheck className="h-4 w-4 text-primary" />
+                    <span>Sealed Password Delivery</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed">
+                    Under constitutional Article 39 rules, voter credentials are exclusively transmitted to your registered student address (<span className="font-mono font-medium text-foreground">{registeredEmail}</span>).
+                  </p>
+                </div>
+              )}
+
+              {/* 3-Step Verification Checklist */}
+              <div className="rounded-2xl border border-border bg-card p-5 space-y-3.5 shadow-xs">
+                <h4 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Next Steps to Access Your Ballot
+                </h4>
+                <ol className="space-y-3 text-xs">
+                  <li className="flex items-start gap-3">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink text-sun text-[10px] font-mono font-bold">1</span>
+                    <span className="text-foreground/90 leading-tight">
+                      Open your <strong className="font-mono text-foreground">@kabarak.ac.ke</strong> university webmail or Gmail app.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink text-sun text-[10px] font-mono font-bold">2</span>
+                    <span className="text-foreground/90 leading-tight">
+                      Locate the email from <strong className="text-foreground">KUPSA Electoral Commission</strong> (subject: <em>Official KUPSA Voter Passcard</em>).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink text-sun text-[10px] font-mono font-bold">3</span>
+                    <span className="text-foreground/90 leading-tight">
+                      Copy the unique access password from the email and proceed to login below.
+                    </span>
+                  </li>
+                </ol>
+              </div>
+
+              {/* Primary Actions */}
+              <div className="space-y-3 pt-1">
+                <a
+                  href="https://mail.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-ink py-3 px-4 text-xs font-semibold text-ink-foreground shadow-xs hover:bg-primary transition-colors cursor-pointer"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span>Open Kabarak Webmail / Gmail Inbox</span>
+                </a>
+
+                <div className="flex items-center justify-between gap-3 pt-2">
                   <button
                     type="button"
-                    onClick={() => setShowSimulatedEmailModal(true)}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-xs font-semibold text-ink-foreground shadow-xs hover:bg-primary transition-colors cursor-pointer"
+                    onClick={handleResend}
+                    disabled={resendCooldown > 0}
+                    className={`inline-flex items-center gap-1.5 text-xs font-medium transition-colors ${
+                      resendCooldown > 0
+                        ? 'text-muted-foreground cursor-not-allowed'
+                        : 'text-primary hover:underline cursor-pointer'
+                    }`}
                   >
-                    <Inbox className="h-4 w-4" />
-                    <span>Open passcard credentials view</span>
+                    <RefreshCw className={`h-3.5 w-3.5 ${resendCooldown > 0 ? 'animate-spin' : ''}`} />
+                    <span>
+                      {resendCooldown > 0 ? `Resend email in ${resendCooldown}s` : 'Resend Passcard Email'}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginEmail(registeredEmail);
+                      setLoginPassword('');
+                      setShowInboxConfirm(false);
+                      setMode('login');
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary transition-colors cursor-pointer"
+                  >
+                    <span>Proceed to Log In</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs">
-                <button
-                  type="button"
-                  onClick={handleResend}
-                  disabled={resendCooldown > 0}
-                  className={`inline-flex items-center gap-1.5 font-medium ${
-                    resendCooldown > 0
-                      ? 'text-muted-foreground cursor-not-allowed'
-                      : 'text-primary hover:underline cursor-pointer'
-                  }`}
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${resendCooldown > 0 ? 'animate-spin' : ''}`} />
-                  <span>
-                    {resendCooldown > 0 ? `Resend email (${resendCooldown}s)` : 'Resend email'}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginEmail(registeredEmail);
-                    if (simulatedEmail) setLoginPassword(simulatedEmail.password);
-                    setShowInboxConfirm(false);
-                    setMode('login');
-                  }}
-                  className="font-semibold text-foreground hover:text-primary transition-colors"
-                >
-                  Proceed to Log In →
-                </button>
-              </div>
+              {/* Security Policy Reminder */}
+              <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
+                Didn't receive an email? Check your <strong>Spam / Junk</strong> folder. Passwords are never revealed on-screen to protect vote integrity.
+              </p>
             </div>
           ) : (
             /* Main Form with Log In / Sign Up Toggle */
@@ -680,102 +674,6 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
           )}
         </div>
       </div>
-
-      {/* Simulated Email Modal */}
-      {showSimulatedEmailModal && simulatedEmail && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 backdrop-blur-xs p-4 animate-in fade-in"
-          onClick={() => setShowSimulatedEmailModal(false)}
-        >
-          <div
-            className="w-full max-w-lg rounded-2xl border-2 border-ink bg-card p-6 shadow-pop animate-in zoom-in-95 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div className="flex items-center gap-2">
-                <Mail className="h-5 w-5 text-primary" />
-                <span className="font-mono text-xs font-semibold text-muted-foreground">
-                  Simulated Student Inbox Preview
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowSimulatedEmailModal(false)}
-                className="text-muted-foreground hover:text-foreground text-xs font-mono font-bold"
-              >
-                Close ✕
-              </button>
-            </div>
-
-            {/* Email Header */}
-            <div className="rounded-xl bg-secondary/50 p-3 space-y-1 text-xs">
-              <div>
-                <span className="text-muted-foreground font-mono">From:</span>{' '}
-                <strong className="text-foreground">KUPSA Electoral Commission &lt;elections@kupsa.ac.ke&gt;</strong>
-              </div>
-              <div>
-                <span className="text-muted-foreground font-mono">To:</span>{' '}
-                <span className="font-mono text-foreground">{simulatedEmail.recipientEmail}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground font-mono">Subject:</span>{' '}
-                <strong className="text-foreground">{simulatedEmail.subject}</strong>
-              </div>
-            </div>
-
-            {/* Email Body */}
-            <div className="space-y-3 text-sm text-foreground/90 leading-relaxed border-t border-b border-border py-4">
-              <p>Dear {simulatedEmail.recipientName},</p>
-              <p>
-                Your student voter registration for the <strong>KUPSA General Elections 2026</strong> has been confirmed against the certified registrar roster.
-              </p>
-              <p>Your one-time official voter account password is:</p>
-
-              {/* Password Box */}
-              <div className="flex items-center justify-between rounded-xl border-2 border-primary bg-primary/5 p-4">
-                <div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-primary font-bold block">
-                    Access Password
-                  </span>
-                  <span className="font-mono text-2xl font-bold tracking-widest text-foreground">
-                    {simulatedEmail.password}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleCopyPassword(simulatedEmail.password)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-ink-foreground shadow-xs hover:bg-primary transition-colors cursor-pointer"
-                >
-                  {copiedPassword ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                  <span>{copiedPassword ? 'Copied' : 'Copy'}</span>
-                </button>
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                Do not share this password. It guarantees your single constitutional vote under Article 39.
-              </p>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginEmail(simulatedEmail.recipientEmail);
-                  setLoginPassword(simulatedEmail.password);
-                  setShowSimulatedEmailModal(false);
-                  setShowInboxConfirm(false);
-                  setMode('login');
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-5 py-2.5 text-xs font-semibold text-ink-foreground shadow-xs hover:bg-primary transition-colors cursor-pointer"
-              >
-                <span>Go to Log in (Pre-fill Credentials)</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

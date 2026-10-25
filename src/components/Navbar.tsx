@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ViewId, ElectionPhase } from '../types';
+import { useVotingStore } from '../context/VotingStore';
 import {
   Menu,
   X,
@@ -31,6 +32,7 @@ const NAV_ITEMS: { id: ViewId; label: string; icon: React.ComponentType<{ classN
 
 export function Navbar({ currentView, onNavigate, currentPhase }: NavbarProps) {
   const [open, setOpen] = useState(false);
+  const { isResultsLive } = useVotingStore();
 
   const handleNav = (view: ViewId) => {
     onNavigate(view);
@@ -80,11 +82,22 @@ export function Navbar({ currentView, onNavigate, currentPhase }: NavbarProps) {
               <button
                 key={item.id}
                 onClick={() => handleNav(item.id)}
-                className={`transition-colors hover:text-foreground relative py-1 ${
+                className={`transition-colors hover:text-foreground relative py-1 inline-flex items-center gap-1.5 ${
                   active ? 'font-semibold text-foreground' : ''
                 }`}
               >
-                {item.label}
+                <span>{item.label}</span>
+                {item.id === 'results' && (
+                  <span
+                    className={`inline-flex items-center rounded-full px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase tracking-wider ${
+                      isResultsLive
+                        ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30 animate-pulse'
+                        : 'bg-secondary text-muted-foreground/80 border border-border text-[9px]'
+                    }`}
+                  >
+                    {isResultsLive ? 'LIVE' : 'SEALED'}
+                  </span>
+                )}
                 {active && (
                   <span className="absolute -bottom-3 left-0 right-0 h-0.5 bg-primary rounded-full" />
                 )}
@@ -144,7 +157,18 @@ export function Navbar({ currentView, onNavigate, currentPhase }: NavbarProps) {
                 >
                   <span className="flex items-center gap-3">
                     <Icon className={`h-4 w-4 ${active ? 'text-primary' : 'opacity-70'}`} />
-                    {item.label}
+                    <span>{item.label}</span>
+                    {item.id === 'results' && (
+                      <span
+                        className={`inline-flex items-center rounded-full px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase tracking-wider ${
+                          isResultsLive
+                            ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30'
+                            : 'bg-secondary text-muted-foreground/80 border border-border'
+                        }`}
+                      >
+                        {isResultsLive ? 'LIVE' : 'SEALED'}
+                      </span>
+                    )}
                   </span>
                   <ChevronRight className="h-4 w-4 opacity-50" />
                 </button>

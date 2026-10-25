@@ -119,45 +119,34 @@ export async function castSecretBallotApi(payload: {
   voterYear: string;
   choices: Record<string, string>;
 }): Promise<{ success: boolean; receiptCode: string; timestamp: string }> {
-  try {
-    const response = await fetch('/api/ballot/cast', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    if (response.ok) {
-      return await response.json();
-    }
-  } catch (err) {
-    console.warn('API /api/ballot/cast error, attempting direct Supabase client fallback:', err);
-  }
-
-  if (supabase) {
-    const receiptCode = 'KUP-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-    const ballotId = crypto.randomUUID();
-    const nowIso = new Date().toISOString();
-
-    const { error: ballotError } = await supabase.from('ballots').insert({
-      id: ballotId,
-      receipt_code: receiptCode,
-      voter_year: payload.voterYear,
+  const response = await fetch('/api/ballot/cast', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: payload.email,
+      voterEmail: payload.email,
+      voterYear: payload.voterYear,
       choices: payload.choices,
-      created_at: nowIso,
-    });
+      selections: payload.choices,
+      verificationHash: 'VOT-' + Math.random().toString(36).substring(2, 10).toUpperCase(),
+    }),
+  });
 
-    if (ballotError) throw new Error(ballotError.message);
+  const data = await response.json().catch(() => ({}));
 
-    await supabase.from('voters').update({
-      has_voted: true,
-      voted_at: nowIso,
-      receipt_code: receiptCode,
-    }).ilike('email', payload.email.trim());
-
-    return { success: true, receiptCode, timestamp: nowIso };
+  if (response.ok && data.success) {
+    return {
+      success: true,
+      receiptCode: data.receiptCode,
+      timestamp: data.timestamp || new Date().toISOString(),
+    };
   }
 
-  throw new Error('Failed to seal ballot.');
+  if (data.error) {
+    throw new Error(data.error);
+  }
+
+  throw new Error(`Failed to seal ballot (Server status: ${response.status})`);
 }
 
 /**
@@ -281,14 +270,19 @@ export async function registerVoterApi(payload: {
   name: string;
   email: string;
   yearOfStudy: string;
-}): Promise<{ success: boolean; voter: DbVoter; alreadyExists: boolean }> {
+}): Promise<{ success: boolean; voter?: DbVoter; alreadyExists?: boolean }> {
   const response = await fetch('/api/voter/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      fullName: payload.name,
+      name: payload.name,
+      email: payload.email,
+      yearOfStudy: payload.yearOfStudy,
+    }),
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.error || 'Failed to register student voter.');
   }
@@ -345,7 +339,7 @@ export function subscribeToElectionRealtime(callbacks: {
     )
     .on(
       'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'election_settings' },
+      { event: '*', schema: 'public', table: 'election_settings' },
       (payload) => {
         if (payload.new && callbacks.onSettingsUpdated) {
           callbacks.onSettingsUpdated(payload.new as DbElectionSettings);

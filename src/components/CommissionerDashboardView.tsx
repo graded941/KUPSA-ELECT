@@ -31,7 +31,6 @@ import {
   Database,
   RefreshCw
 } from 'lucide-react';
-import { useGmail } from '../context/GmailContext';
 import { GmailBroadcastPanel } from './GmailBroadcastPanel';
 import { isSupabaseConfigured } from '../lib/supabaseClient';
 
@@ -42,7 +41,6 @@ interface CommissionerDashboardViewProps {
 type TabType = 'overview' | 'results-control' | 'controls' | 'voter-roll' | 'candidates' | 'ballot-ledger' | 'gmail-broadcast';
 
 export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardViewProps) {
-  const { isGmailConnected } = useGmail();
   const {
     votes,
     totalRegistered,
@@ -104,11 +102,16 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
   const [voterCohortFilter, setVoterCohortFilter] = useState('all');
   const [voterStatusFilter, setVoterStatusFilter] = useState<'all' | 'voted' | 'not-voted'>('all');
 
+  const effectiveOffices = useMemo(() => {
+    return dbOffices && dbOffices.length > 0 ? dbOffices : SHARED_OFFICES;
+  }, [dbOffices]);
+
   // Candidate list combined from Supabase dbCandidates or fallback
   const candidateList = useMemo(() => {
     if (dbCandidates && dbCandidates.length > 0) {
       return dbCandidates.map((c) => {
-        const off = SHARED_OFFICES.find((o) => o.id === c.office_id);
+        const off = effectiveOffices.find((o) => o.id === c.office_id);
+        const clearanceRec = candidateClearances[c.id];
         return {
           id: c.id,
           name: c.name,
@@ -117,6 +120,8 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
           photoUrl: c.photo_url || '',
           manifestoSummary: c.manifesto_summary || '',
           yearOfStudy: c.year_of_study || 'Year 3',
+          clearanceStatus: clearanceRec?.status || c.clearance_status || 'Cleared & Certified',
+          clearanceNotes: clearanceRec?.notes || c.clearance_notes || '',
         };
       });
     }
@@ -128,8 +133,10 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
       photoUrl: c.photoUrl || '',
       manifestoSummary: c.manifestoSummary || '',
       yearOfStudy: c.yearOfStudy || 'Year 3',
+      clearanceStatus: 'Cleared & Certified',
+      clearanceNotes: '',
     }));
-  }, [dbCandidates]);
+  }, [dbCandidates, effectiveOffices, candidateClearances]);
 
   // Candidate edit state
   const [selectedCandidateId, setSelectedCandidateId] = useState<string>(SHARED_CANDIDATES[0]?.id || 'cand-01');
@@ -218,10 +225,10 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
     });
   }, [accreditationList, voterSearch, voterCohortFilter, voterStatusFilter]);
 
-  // Calculate tallies per office
+  // Calculate tallies per office dynamically from live database
   const officeResults = useMemo(() => {
-    return SHARED_OFFICES.map((office) => {
-      const candidates = SHARED_CANDIDATES.filter((c) => c.officeId === office.id);
+    return effectiveOffices.map((office) => {
+      const candidates = candidateList.filter((c) => c.officeId === office.id);
       const tallies = candidates.map((cand) => {
         const count = votes.filter((v) => v.choices[office.id] === cand.id).length;
         return { ...cand, count };
@@ -240,7 +247,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
         hasCandidates: candidates.length > 0,
       };
     });
-  }, [votes]);
+  }, [effectiveOffices, candidateList, votes]);
 
   // Save announcement banner
   const handleSaveBanner = (e: React.FormEvent) => {
@@ -490,7 +497,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
               { id: 'voter-roll', label: 'Voter Roll & Registry', icon: Users },
               { id: 'candidates', label: 'Candidate Clearance', icon: ShieldCheck },
               { id: 'ballot-ledger', label: 'Cast Ballots Ledger', icon: FileText, badge: `${totalVotesCast}` },
-              { id: 'gmail-broadcast', label: 'Gmail Dispatcher', icon: Mail, badge: isGmailConnected ? 'GMAIL ACTIVE' : undefined },
+              { id: 'gmail-broadcast', label: 'Email Dispatcher', icon: Mail, badge: 'PORT 465 SSL' },
             ].map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -1472,28 +1479,36 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {votes.slice(0, 30).map((v) => {
-                      const chairCand = SHARED_CANDIDATES.find((c) => c.id === v.choices.chairperson);
-                      const vcCand = SHARED_CANDIDATES.find((c) => c.id === v.choices['vice-chairperson']);
-                      return (
-                        <tr key={v.id} className="hover:bg-secondary/30 transition-colors">
-                          <td className="p-3.5 font-mono text-primary font-bold">{v.receiptCode}</td>
-                          <td className="p-3.5 font-mono text-muted-foreground">{v.timestamp}</td>
-                          <td className="p-3.5 font-mono text-foreground">{v.voterYear}</td>
-                          <td className="p-3.5 font-medium text-foreground">
-                            {chairCand ? chairCand.name : v.choices.chairperson === 'abstain' ? 'Abstained' : 'None'}
-                          </td>
-                          <td className="p-3.5 font-medium text-foreground">
-                            {vcCand ? vcCand.name : v.choices['vice-chairperson'] === 'abstain' ? 'Abstained' : 'None'}
-                          </td>
-                          <td className="p-3.5 text-right">
-                            <span className="inline-flex items-center gap-1 font-mono text-[10px] text-emerald-700 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                              <CheckCircle2 className="h-3 w-3" /> Sealed
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {votes.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-muted-foreground font-mono">
+                          No ballots cast yet. As accredited students submit secret votes, sealed anonymous entries will appear here in real-time.
+                        </td>
+                      </tr>
+                    ) : (
+                      votes.slice(0, 30).map((v) => {
+                        const chairCand = candidateList.find((c) => c.id === v.choices.chairperson);
+                        const vcCand = candidateList.find((c) => c.id === v.choices['vice-chairperson']);
+                        return (
+                          <tr key={v.id} className="hover:bg-secondary/30 transition-colors">
+                            <td className="p-3.5 font-mono text-primary font-bold">{v.receiptCode}</td>
+                            <td className="p-3.5 font-mono text-muted-foreground">{v.timestamp}</td>
+                            <td className="p-3.5 font-mono text-foreground">{v.voterYear}</td>
+                            <td className="p-3.5 font-medium text-foreground">
+                              {chairCand ? chairCand.name : v.choices.chairperson === 'abstain' ? 'Abstained' : 'None'}
+                            </td>
+                            <td className="p-3.5 font-medium text-foreground">
+                              {vcCand ? vcCand.name : v.choices['vice-chairperson'] === 'abstain' ? 'Abstained' : 'None'}
+                            </td>
+                            <td className="p-3.5 text-right">
+                              <span className="inline-flex items-center gap-1 font-mono text-[10px] text-emerald-700 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                                <CheckCircle2 className="h-3 w-3" /> Sealed
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>

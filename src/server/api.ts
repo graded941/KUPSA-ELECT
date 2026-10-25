@@ -316,12 +316,12 @@ app.get('/api/election/state', async (_req: Request, res: Response) => {
       supabaseAdmin.from('offices').select('*').order('display_order', { ascending: true }),
       supabaseAdmin.from('candidates').select('*').order('created_at', { ascending: true }),
       supabaseAdmin.from('voters').select('*').order('full_name', { ascending: true }),
-      supabaseAdmin.from('ballots').select('*').order('cast_at', { ascending: false }),
+      supabaseAdmin.from('ballots').select('*').order('created_at', { ascending: false }),
     ]);
 
     return res.json({
       settings: settingsRes.data || {
-        is_results_live: true,
+        is_results_live: false,
         election_phase: 'polling-live',
         announcement_banner: '',
       },
@@ -336,16 +336,108 @@ app.get('/api/election/state', async (_req: Request, res: Response) => {
   }
 });
 
+// Helper: Ensure a voter row exists in public.voters while satisfying the foreign key constraint to auth.users
+async function ensureVoterRecord(
+  email: string,
+  fullName?: string,
+  yearOfStudy?: string,
+  initialPassword?: string
+): Promise<any> {
+  if (!supabaseAdmin) return null;
+  const cleanEmail = email.trim().toLowerCase();
+
+  // 1. Check existing voter record in public.voters
+  const { data: existing } = await supabaseAdmin
+    .from('voters')
+    .select('*')
+    .ilike('email', cleanEmail)
+    .maybeSingle();
+
+  if (existing) return existing;
+
+  if (!cleanEmail.endsWith('@kabarak.ac.ke')) return null;
+
+  // 2. Obtain an auth.users ID to satisfy the foreign key constraint voters_id_fkey
+  let authUserId: string | null = null;
+  const generatedPassword = initialPassword || `KUP-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+  const regSuffix = Math.floor(1000 + Math.random() * 9000);
+  const regNo = `PHARM/2026/${regSuffix}`;
+  const studentName = (fullName || cleanEmail.split('@')[0].replace(/[._-]/g, ' ')).replace(/\b\w/g, (c) => c.toUpperCase());
+
+  try {
+    const { data: authUser } = await supabaseAdmin.auth.admin.createUser({
+      email: cleanEmail,
+      password: generatedPassword,
+      email_confirm: true,
+      user_metadata: { full_name: studentName, year_of_study: yearOfStudy || 'Year 3', reg_no: regNo },
+    });
+    if (authUser?.user?.id) {
+      authUserId = authUser.user.id;
+    }
+  } catch (_e) {
+    // If user already exists in auth.users, fetch from user list
+  }
+
+  if (!authUserId) {
+    try {
+      const { data: list } = await supabaseAdmin.auth.admin.listUsers();
+      const matched = list?.users?.find((u) => u.email?.toLowerCase() === cleanEmail);
+      if (matched) authUserId = matched.id;
+    } catch (e) {
+      console.error('Error finding auth user by email:', e);
+    }
+  }
+
+  if (!authUserId) return null;
+
+  // 3. Upsert into public.voters
+  const { data: insertedVoter, error: insErr } = await supabaseAdmin
+    .from('voters')
+    .upsert({
+      id: authUserId,
+      reg_no: regNo,
+      email: cleanEmail,
+      full_name: studentName,
+      year_of_study: yearOfStudy || 'Year 3',
+      accreditation_status: 'Eligible',
+      has_voted: false,
+    }, { onConflict: 'id' })
+    .select()
+    .maybeSingle();
+
+  if (insErr) {
+    console.error('Failed to create voter in public.voters:', insErr);
+  }
+
+  const finalVoter = insertedVoter || {
+    id: authUserId,
+    reg_no: regNo,
+    email: cleanEmail,
+    full_name: studentName,
+    year_of_study: yearOfStudy || 'Year 3',
+    accreditation_status: 'Eligible',
+    has_voted: false,
+  };
+
+  return {
+    ...finalVoter,
+    generatedPassword,
+  };
+}
+
 // Cast Anonymized Ballot
 app.post('/api/ballot/cast', async (req: Request, res: Response) => {
   if (!supabaseAdmin) {
     return res.status(503).json({ error: 'Database service unavailable' });
   }
 
-  const { voterEmail, voterReg, selections, verificationHash, clientTimestamp } = req.body;
+  const email = (req.body.email || req.body.voterEmail || '').trim().toLowerCase();
+  const choices = req.body.choices || req.body.selections || {};
+  const voterYear = req.body.voterYear || req.body.yearOfStudy || 'Year 3';
+  const clientHash = (req.body.verificationHash || Math.random().toString(36).substring(2, 10)).toUpperCase();
 
-  if (!voterEmail || !selections || !verificationHash) {
-    return res.status(400).json({ error: 'Missing required ballot parameters' });
+  if (!email || Object.keys(choices).length === 0) {
+    return res.status(400).json({ error: 'Missing required ballot parameters: email and choices' });
   }
 
   try {
@@ -357,15 +449,13 @@ app.post('/api/ballot/cast', async (req: Request, res: Response) => {
       });
     }
 
-    // 2. Fetch voter record to verify eligibility and ensure they haven't voted
-    const { data: voter, error: voterFetchErr } = await supabaseAdmin
-      .from('voters')
-      .select('*')
-      .ilike('email', voterEmail.trim())
-      .maybeSingle();
+    // 2. Fetch or auto-provision voter record (satisfying voters_id_fkey)
+    const voter = await ensureVoterRecord(email, undefined, voterYear);
 
-    if (voterFetchErr || !voter) {
-      return res.status(404).json({ error: 'Voter not found in official accredited voter roll' });
+    if (!voter) {
+      return res.status(404).json({
+        error: 'Voter not found in official accredited voter roll. Please ensure you are signed in with an official @kabarak.ac.ke email.',
+      });
     }
 
     if (voter.has_voted) {
@@ -376,24 +466,27 @@ app.post('/api/ballot/cast', async (req: Request, res: Response) => {
     }
 
     // 3. Generate Anonymous Receipt Code
-    const cleanHash = verificationHash.substring(0, 8).toUpperCase();
-    const receiptCode = `KUP-2026-${cleanHash}`;
+    const cleanHash = clientHash.substring(0, 6).toUpperCase();
+    const receiptCode = `KUPSA-2026-REC-${cleanHash}`;
+    const ballotId = crypto.randomUUID();
+    const nowIso = new Date().toISOString();
 
-    // 4. Record Ballot anonymously
+    // 4. Record Ballot anonymously using exact schema columns (id, receipt_code, voter_year, choices, created_at)
     const { data: ballotData, error: ballotErr } = await supabaseAdmin
       .from('ballots')
       .insert({
+        id: ballotId,
         receipt_code: receiptCode,
-        verification_hash: verificationHash,
-        selections: selections,
-        cast_at: clientTimestamp || new Date().toISOString(),
+        voter_year: voter.year_of_study || voterYear,
+        choices: choices,
+        created_at: nowIso,
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (ballotErr) {
       console.error('Failed to insert ballot:', ballotErr);
-      return res.status(500).json({ error: 'Failed to securely seal ballot in database' });
+      return res.status(500).json({ error: `Failed to securely seal ballot in database: ${ballotErr.message}` });
     }
 
     // 5. Mark Voter as voted
@@ -401,7 +494,7 @@ app.post('/api/ballot/cast', async (req: Request, res: Response) => {
       .from('voters')
       .update({
         has_voted: true,
-        voted_at: new Date().toISOString(),
+        voted_at: nowIso,
         receipt_code: receiptCode,
       })
       .eq('id', voter.id);
@@ -412,21 +505,21 @@ app.post('/api/ballot/cast', async (req: Request, res: Response) => {
 
     // 6. Record Audit Log entry
     await supabaseAdmin.from('audit_logs').insert({
-      officer_email: 'system.cryptography@kabarak.ac.ke',
+      officer_email: 'ballot.cryptography@kabarak.ac.ke',
       officer_role: 'Automated Cryptographic Sealer',
       action_type: 'BALLOT_SEALED',
       details: {
         receiptCode,
-        yearOfStudy: voter.year_of_study,
-        timestamp: new Date().toISOString(),
+        yearOfStudy: voter.year_of_study || voterYear,
+        timestamp: nowIso,
       },
     });
 
     return res.json({
       success: true,
       receiptCode,
-      ballotId: ballotData?.id,
-      timestamp: ballotData?.cast_at || new Date().toISOString(),
+      ballotId: ballotData?.id || ballotId,
+      timestamp: nowIso,
     });
   } catch (err: any) {
     console.error('Error casting ballot:', err);
@@ -498,7 +591,7 @@ app.post('/api/election/seed', async (req: Request, res: Response) => {
     const { data: settings } = await supabaseAdmin.from('election_settings').select('id').limit(1).maybeSingle();
     if (!settings) {
       await supabaseAdmin.from('election_settings').insert({
-        is_results_live: true,
+        is_results_live: false,
         election_phase: 'polling-live',
         announcement_banner: 'Official Notice: General Polling in session under Chapter Six statutory authority.',
       });
@@ -554,7 +647,7 @@ app.post('/api/election/settings', async (req: Request, res: Response) => {
     } else {
       await supabaseAdmin.from('election_settings').insert({
         ...updatePayload,
-        is_results_live: updatePayload.is_results_live ?? true,
+        is_results_live: updatePayload.is_results_live ?? false,
         election_phase: updatePayload.election_phase ?? 'polling-live',
         announcement_banner: updatePayload.announcement_banner ?? '',
       });
@@ -664,8 +757,10 @@ app.post('/api/voter/signup', async (req: Request, res: Response) => {
     return res.status(503).json({ error: 'Database service unavailable' });
   }
 
-  const { fullName, email, yearOfStudy } = req.body;
-  const cleanEmail = (email || '').trim().toLowerCase();
+  const rawName = (req.body.fullName || req.body.name || req.body.studentName || '').trim();
+  const cleanName = rawName || 'Pharmacy Student';
+  const cleanEmail = (req.body.email || '').trim().toLowerCase();
+  const yearOfStudy = req.body.yearOfStudy || 'Year 1';
 
   if (!cleanEmail.endsWith('@kabarak.ac.ke')) {
     return res.status(400).json({ error: 'Only official Kabarak University emails (@kabarak.ac.ke) are permitted' });
@@ -685,57 +780,26 @@ app.post('/api/voter/signup', async (req: Request, res: Response) => {
       });
     }
 
-    const regSuffix = Math.floor(1000 + Math.random() * 9000);
-    const regNo = `PHARM/2026/${regSuffix}`;
-    const generatedPassword = `KUP-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+    const userPassword = (req.body.password || `KUP-2026-${Math.floor(100000 + Math.random() * 900000)}`).trim();
+    const voter = await ensureVoterRecord(cleanEmail, cleanName, yearOfStudy, userPassword);
 
-    let authUserId: string | null = null;
-    try {
-      const { data: authUser, error: authErr } = await supabaseAdmin.auth.admin.createUser({
-        email: cleanEmail,
-        password: generatedPassword,
-        email_confirm: true,
-        user_metadata: { full_name: fullName, year_of_study: yearOfStudy, reg_no: regNo },
-      });
-
-      if (authUser?.user?.id) {
-        authUserId = authUser.user.id;
-      } else if (authErr) {
-        console.warn('Auth user creation warning:', authErr);
-      }
-    } catch (e) {
-      console.error('Supabase Auth error:', e);
-    }
-
-    const voterRecordId = authUserId || `voter-${Date.now()}`;
-
-    const { error: insertErr } = await supabaseAdmin.from('voters').insert({
-      id: voterRecordId,
-      reg_no: regNo,
-      email: cleanEmail,
-      full_name: fullName.trim(),
-      year_of_study: yearOfStudy || 'Year 1',
-      accreditation_status: 'Eligible',
-      has_voted: false,
-    });
-
-    if (insertErr) {
-      throw insertErr;
+    if (!voter) {
+      return res.status(500).json({ error: 'Failed to create accredited voter account in registry.' });
     }
 
     await supabaseAdmin.from('audit_logs').insert({
       officer_email: 'self-service.registration@kabarak.ac.ke',
       officer_role: 'Automated Registrar',
       action_type: 'VOTER_REGISTERED',
-      details: { email: cleanEmail, regNo, yearOfStudy, timestamp: new Date().toISOString() },
+      details: { email: cleanEmail, regNo: voter.reg_no, yearOfStudy, timestamp: new Date().toISOString() },
     });
 
     return res.json({
       success: true,
-      voterId: voterRecordId,
+      voterId: voter.id,
       email: cleanEmail,
-      regNo,
-      password: generatedPassword,
+      regNo: voter.reg_no,
+      password: voter.generatedPassword || userPassword,
     });
   } catch (err: any) {
     console.error('Signup error:', err);

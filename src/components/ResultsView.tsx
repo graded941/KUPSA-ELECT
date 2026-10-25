@@ -171,17 +171,28 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
   }, [electionClosureDate]);
 
   // Authentic receipt verification against database cast votes
-  const handleVerifyReceipt = (e: React.FormEvent) => {
+  const handleVerifyReceipt = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = searchReceipt.trim().toUpperCase();
     if (!cleanCode) return;
 
-    const matched = votes.some((v) => v.receiptCode.toUpperCase() === cleanCode);
-    if (matched) {
+    if (votes.some((v) => v.receiptCode.toUpperCase() === cleanCode)) {
       setReceiptVerificationResult('CONFIRMED_VALID');
-    } else {
-      setReceiptVerificationResult('INVALID_HASH');
+      return;
     }
+
+    // Attempt on-demand refresh in case the ballot was sealed moments ago
+    try {
+      await refreshDbState();
+    } catch {
+      // Continue to check
+    }
+
+    // Check again
+    setTimeout(() => {
+      const matchAfterSync = votes.some((v) => v.receiptCode.toUpperCase() === cleanCode);
+      setReceiptVerificationResult(matchAfterSync ? 'CONFIRMED_VALID' : 'INVALID_HASH');
+    }, 200);
   };
 
   const filteredResults = officeResults.filter(

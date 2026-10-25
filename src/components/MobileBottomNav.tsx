@@ -1,5 +1,6 @@
 import React from 'react';
 import { ViewId } from '../types';
+import { useVotingStore } from '../context/VotingStore';
 import { Home, Users, Vote, BarChart3, BookOpen } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -8,6 +9,7 @@ interface MobileBottomNavProps {
 }
 
 export function MobileBottomNav({ currentView, onNavigate }: MobileBottomNavProps) {
+  const { isResultsLive } = useVotingStore();
   const isTabActive = (tab: string) => {
     if (tab === 'home' && currentView === 'overview') return true;
     if (tab === 'candidates' && currentView === 'candidates') return true;
@@ -69,11 +71,19 @@ export function MobileBottomNav({ currentView, onNavigate }: MobileBottomNavProp
         {/* Results */}
         <button
           onClick={() => onNavigate('results')}
-          className={`flex flex-col items-center justify-center gap-1 h-full py-1 transition-colors ${
+          className={`flex flex-col items-center justify-center gap-1 h-full py-1 transition-colors relative ${
             isTabActive('results') ? 'text-primary font-semibold' : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          <BarChart3 className="h-5 w-5" />
+          <div className="relative">
+            <BarChart3 className="h-5 w-5" />
+            {isResultsLive && (
+              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+            )}
+            {isResultsLive && (
+              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-600" />
+            )}
+          </div>
           <span className="text-[11px] font-sans">Results</span>
         </button>
 

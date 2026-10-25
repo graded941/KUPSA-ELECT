@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ViewId, ElectionPhase } from '../types';
+import { useVotingStore } from '../context/VotingStore';
 import {
   ArrowRight,
   ShieldCheck,
@@ -7,7 +8,9 @@ import {
   Vote,
   FileCheck2,
   Plus,
-  Minus
+  Minus,
+  Sparkles,
+  Lock
 } from 'lucide-react';
 import { ElectionCountdown } from './ElectionCountdown';
 
@@ -81,9 +84,85 @@ const ARTICLES = [
 
 export function OverviewView({ onNavigate, onOpenAudit, onOpenRehearsal, currentPhase }: OverviewViewProps) {
   const [openArticle, setOpenArticle] = useState<number | null>(39);
+  const { isResultsLive, votes } = useVotingStore();
+
+  const dynamicSteps = [
+    {
+      icon: Users,
+      title: 'Meet the candidates',
+      body: 'Read every manifesto, vetting clearance report, and compliance check before voting.',
+      target: 'candidates' as ViewId,
+      ctaText: 'View Candidates',
+      badge: null,
+    },
+    {
+      icon: FileCheck2,
+      title: 'Confirm you can vote',
+      body: 'Check your voter eligibility with your university registration number before polling opens.',
+      target: 'portal' as ViewId,
+      ctaText: 'Check Eligibility',
+      badge: null,
+    },
+    {
+      icon: Vote,
+      title: 'Cast a secret ballot',
+      body: 'Nobody — not even the Commission — can link your cast ballot back to your identity.',
+      target: 'portal' as ViewId,
+      ctaText: 'Voting Simulator',
+      badge: null,
+    },
+    {
+      icon: ShieldCheck,
+      title: isResultsLive ? 'See live verified results' : 'See verified results',
+      body: isResultsLive
+        ? `Results are live! ${votes.length} secret ballots counted and certified across all School of Pharmacy offices.`
+        : 'Official tallies are sealed under Article 46 until polls close at 5:00 PM. Anonymous hashes verifiable anytime.',
+      target: 'results' as ViewId,
+      ctaText: isResultsLive ? 'Inspect Live Tallies' : 'View Embargo Timer',
+      badge: isResultsLive ? 'LIVE NOW' : 'EMBARGOED',
+    },
+  ];
 
   return (
     <div className="space-y-0">
+      {/* Dynamic Results Status Notice Banner across all devices */}
+      {isResultsLive ? (
+        <div className="bg-emerald-600 text-white px-4 py-3 sm:px-6 shadow-sm border-b border-emerald-700">
+          <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 text-xs sm:text-sm font-medium">
+              <span className="flex h-2.5 w-2.5 rounded-full bg-white animate-ping" />
+              <span>
+                <strong>OFFICIAL COMMISSION NOTICE:</strong> Live candidate election tallies have been unsealed and are streaming across all student portals.
+              </span>
+            </div>
+            <button
+              onClick={() => onNavigate('results')}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-50 transition-colors shadow-xs"
+            >
+              <span>View Live Results</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-secondary/70 border-b border-border px-4 py-2 sm:px-6">
+          <div className="mx-auto max-w-6xl flex items-center justify-between gap-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 font-mono">
+              <Lock className="h-3 w-3 text-primary" />
+              <span>
+                <strong>Article 46 Embargo Active:</strong> Candidate tallies sealed until 17:00 EAT. Anonymous ballot hashes can be verified anytime.
+              </span>
+            </div>
+            <button
+              onClick={() => onNavigate('results')}
+              className="shrink-0 font-mono text-xs font-semibold text-primary hover:underline"
+            >
+              Check Embargo Status →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="grain relative overflow-hidden border-b border-border bg-background">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 py-12 sm:py-16 md:py-24 lg:grid-cols-[1.25fr_1fr]">
@@ -228,7 +307,7 @@ export function OverviewView({ onNavigate, onOpenAudit, onOpenRehearsal, current
         </div>
 
         <div className="mt-10 sm:mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {STEPS.map((s, i) => {
+          {dynamicSteps.map((s, i) => {
             const Icon = s.icon;
             return (
               <div
@@ -241,9 +320,22 @@ export function OverviewView({ onNavigate, onOpenAudit, onOpenRehearsal, current
                     <span className="bg-brand flex h-11 w-11 items-center justify-center rounded-xl text-ink shadow-xs">
                       <Icon className="h-5 w-5" />
                     </span>
-                    <span className="font-mono text-sm font-semibold text-muted-foreground">
-                      0{i + 1}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {s.badge && (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider ${
+                            s.badge.includes('LIVE')
+                              ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30'
+                              : 'bg-secondary text-muted-foreground border border-border'
+                          }`}
+                        >
+                          {s.badge}
+                        </span>
+                      )}
+                      <span className="font-mono text-sm font-semibold text-muted-foreground">
+                        0{i + 1}
+                      </span>
+                    </div>
                   </div>
                   <h3 className="mt-5 font-display text-xl font-semibold text-foreground group-hover:text-primary transition-colors">
                     {s.title}
