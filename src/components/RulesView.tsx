@@ -3,6 +3,7 @@ import { ViewId } from '../types';
 import { CONSTITUTIONAL_ARTICLES } from '../data/election';
 import { PageIntro } from './site-shell';
 import { Minus, Plus, BookOpen, ShieldCheck, ArrowRight } from 'lucide-react';
+import { HelpdeskAppealModal } from './HelpdeskAppealModal';
 
 interface RulesViewProps {
   onNavigate: (view: ViewId) => void;
@@ -13,6 +14,7 @@ export function RulesView({ onNavigate, onOpenAudit }: RulesViewProps) {
   const [openArticle, setOpenArticle] = useState<number | null>(
     CONSTITUTIONAL_ARTICLES[0]?.number ?? 39
   );
+  const [isAppealModalOpen, setIsAppealModalOpen] = useState(false);
 
   return (
     <>
@@ -95,13 +97,21 @@ export function RulesView({ onNavigate, onOpenAudit }: RulesViewProps) {
             </p>
           </div>
           <button
-            onClick={() => onNavigate('help')}
-            className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-ink-foreground hover:bg-primary transition-colors shrink-0"
+            type="button"
+            onClick={() => setIsAppealModalOpen(true)}
+            className="rounded-full bg-ink px-5 py-2.5 text-xs font-semibold text-ink-foreground hover:bg-primary transition-colors shrink-0 shadow-xs cursor-pointer inline-flex items-center gap-1.5"
           >
-            File Appeal
+            <span>File an appeal</span>
+            <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
+
+      {/* Interactive Appeal Filing Modal */}
+      <HelpdeskAppealModal
+        isOpen={isAppealModalOpen}
+        onClose={() => setIsAppealModalOpen(false)}
+      />
     </>
   );
 }

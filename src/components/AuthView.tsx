@@ -142,7 +142,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
   };
 
   // Handle Log In
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
 
@@ -157,7 +157,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
     }
 
     setIsSubmitting(true);
-    const res = login(loginEmail, loginPassword);
+    const res = await login(loginEmail, loginPassword);
     setIsSubmitting(false);
 
     if (!res.success) {
@@ -169,32 +169,20 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
     onNavigate('portal');
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (resendCooldown > 0) return;
-    resendEmail(registeredEmail);
+    setGmailDeliveryStatus('sending');
     setResendCooldown(60);
 
-    if (simulatedEmail) {
-      setGmailDeliveryStatus('sending');
-      const randomReg = `PHARM/2026/${Math.floor(1000 + Math.random() * 9000)}`;
-
-      dispatchVoterPassEmail({
-        studentName: simulatedEmail.recipientName,
-        regNo: randomReg,
-        yearOfStudy: 'Year 3',
-        email: registeredEmail,
-        passwordCode: simulatedEmail.password,
-        pollingStation: 'School of Pharmacy Complex, Kabarak University',
-      }).then((result) => {
-        if (result.success) {
-          setGmailDeliveryStatus('sent');
-          setGmailMsgId(result.messageId || result.outboxId || 'sent');
-        } else {
-          setGmailDeliveryStatus('fallback');
-        }
-      }).catch(() => {
-        setGmailDeliveryStatus('fallback');
-      });
+    const res = await resendEmail(registeredEmail);
+    if (res.success) {
+      setGmailDeliveryStatus('sent');
+      setGmailMsgId('resent');
+    } else {
+      setGmailDeliveryStatus('fallback');
+      if (res.error) {
+        setSignupError(res.error);
+      }
     }
   };
 

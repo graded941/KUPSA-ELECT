@@ -264,13 +264,13 @@ export async function updateVoterAccreditationApi(payload: {
 }
 
 /**
- * Register a new voter in Supabase
+ * Register a new voter in Supabase (Server generates cryptographic 6-digit PIN)
  */
 export async function registerVoterApi(payload: {
   name: string;
   email: string;
   yearOfStudy: string;
-}): Promise<{ success: boolean; voter?: DbVoter; alreadyExists?: boolean }> {
+}): Promise<{ success: boolean; voter?: DbVoter; alreadyExists?: boolean; password?: string; user?: any }> {
   const response = await fetch('/api/voter/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -285,6 +285,63 @@ export async function registerVoterApi(payload: {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.error || 'Failed to register student voter.');
+  }
+  return data;
+}
+
+/**
+ * Server-side authentication verifying voter credentials against Supabase Auth
+ * and enforcing sliding-window anti-brute-force rate limits (HTTP 429).
+ */
+export async function loginVoterApi(payload: {
+  email: string;
+  password: string;
+}): Promise<{
+  success: boolean;
+  user: {
+    id?: string;
+    email: string;
+    name: string;
+    yearOfStudy: string;
+    regNo: string;
+    hasVoted: boolean;
+    votedAt?: string | null;
+    receiptCode?: string | null;
+    accreditationStatus: string;
+    password: string;
+  };
+}> {
+  const response = await fetch('/api/voter/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || `Authentication failed (Server status: ${response.status})`);
+  }
+  return data;
+}
+
+/**
+ * Request server-side PIN re-dispatch with 60-second cooldown protection
+ */
+export async function resendVoterPinApi(email: string): Promise<{
+  success: boolean;
+  message: string;
+  pin?: string;
+  cooldownSeconds?: number;
+}> {
+  const response = await fetch('/api/voter/resend-pin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to resend PIN.');
   }
   return data;
 }

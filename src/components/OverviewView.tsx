@@ -22,7 +22,6 @@ interface OverviewViewProps {
 }
 
 const STATUS = [
-  { label: 'Status', value: 'Getting ready', note: '3 of 5 checks done', live: true },
   { label: 'Voting day', value: 'First Friday, Nov', note: 'Article 41(1)', live: false },
   { label: 'Run by', value: 'Electoral Commission', note: '5 independent members', live: false },
   { label: 'Voters', value: '~1,000 students', note: 'School of Pharmacy', live: false },
@@ -213,7 +212,7 @@ export function OverviewView({ onNavigate, onOpenAudit, onOpenRehearsal, current
               </div>
 
               <h2 className="mt-5 font-display text-2xl font-semibold text-foreground">
-                Chairperson
+                The President
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">Select exactly one cleared candidate</p>
 
@@ -275,7 +274,7 @@ export function OverviewView({ onNavigate, onOpenAudit, onOpenRehearsal, current
 
       {/* Dark Stat Strip */}
       <section className="bg-ink text-ink-foreground border-b border-white/10">
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px px-4 sm:px-6 lg:grid-cols-4">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 sm:grid-cols-3 gap-px px-4 sm:px-6">
           {STATUS.map((s) => (
             <div key={s.label} className="py-6 sm:py-7 lg:px-6 lg:first:pl-0">
               <p className="eyebrow opacity-60 text-sun">{s.label}</p>

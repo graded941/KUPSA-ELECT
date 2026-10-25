@@ -169,8 +169,8 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
   // Login handler
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanPass = passcode.trim().toLowerCase();
-    if (cleanPass === 'kupsa2026' || cleanPass === 'admin' || cleanPass === 'commissioner' || cleanPass === 'kupsa') {
+    const cleanPass = passcode.trim();
+    if (cleanPass === 'Vervetend@kupsa2027.' || cleanPass === 'Vervetend@kupsa2027') {
       setIsAuthenticated(true);
       sessionStorage.setItem('kupsa_commissioner_auth', 'true');
       sessionStorage.setItem('kupsa_officer_name', officerName);
@@ -346,7 +346,6 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                 <label className="text-xs font-semibold text-foreground">
                   Security Key / Passcode
                 </label>
-                <span className="text-[11px] font-mono text-muted-foreground">Default: kupsa2026</span>
               </div>
               <div className="relative">
                 <input
@@ -356,7 +355,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                     setPasscode(e.target.value);
                     if (authError) setAuthError(false);
                   }}
-                  placeholder="Enter passcode (kupsa2026)"
+                  placeholder="Enter commission security key"
                   className="w-full rounded-xl border border-border bg-background py-2.5 pl-3.5 pr-10 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none font-mono"
                 />
                 <button
@@ -371,7 +370,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
               {authError && (
                 <p className="mt-1.5 text-xs text-destructive font-medium flex items-center gap-1">
                   <AlertTriangle className="h-3.5 w-3.5" />
-                  <span>Invalid security key. Hint: use <code>kupsa2026</code></span>
+                  <span>Invalid commission security key. Access restricted to accredited officers.</span>
                 </p>
               )}
             </div>
@@ -587,99 +586,29 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
               <div>
                 <span className="eyebrow text-primary">Live Monitor</span>
                 <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
-                  Electoral Commission Executive Monitor
+                  Monitor
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Statutory electoral metrics and certified tallies under Article 41 & 46 oversight
                 </p>
               </div>
 
-              {/* Testing tool button: simulate incoming student vote (no fake sync icon) */}
-              <button
-                type="button"
-                onClick={() => simulateIncomingVote()}
-                className="inline-flex items-center gap-1.5 rounded-full border-2 border-ink bg-primary/10 text-primary px-4 py-2 text-xs font-semibold shadow-xs hover:bg-primary hover:text-primary-foreground transition-colors self-start sm:self-auto cursor-pointer"
-                title="Generates a specimen vote to test live tally reactivity"
-              >
-                <Vote className="h-3.5 w-3.5" />
-                <span>Simulate student vote</span>
-              </button>
-            </div>
-
-            {/* Central Electoral Database Status Plaque */}
-            <div className="rounded-2xl border-2 border-ink bg-card p-4 sm:p-5 shadow-xs space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-sun shrink-0">
-                    <Database className="h-5 w-5" />
-                    <span
-                      className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${
-                        isRealtimeConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-display text-sm font-bold text-foreground">
-                        Central Electoral Database Synchronized
-                      </h4>
-                      <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-500/15 px-2 py-0.5 rounded">
-                        {isRealtimeConnected ? 'REALTIME STREAM ACTIVE' : 'CONNECTED'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                      Multi-Zone Cloud Registry · Status: Certified & Operational · Last sync: {lastSyncTime || 'Active'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => refreshDbState()}
-                    disabled={isLoadingDb}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary cursor-pointer"
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${isLoadingDb ? 'animate-spin' : ''}`} />
-                    <span>Sync Now</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setIsSeeding(true);
-                      try {
-                        const res = await seedOfficialRoster();
-                        setSeedSuccessMessage(res.message);
-                        setTimeout(() => setSeedSuccessMessage(null), 4000);
-                      } catch (e: any) {
-                        alert(e.message);
-                      } finally {
-                        setIsSeeding(false);
-                      }
-                    }}
-                    disabled={isSeeding}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-1.5 text-xs font-semibold text-ink-foreground hover:bg-primary transition-colors cursor-pointer"
-                  >
-                    <Sparkles className="h-3.5 w-3.5 text-sun" />
-                    <span>{isSeeding ? 'Seeding...' : 'Seed Official 2026/2027 Roster'}</span>
-                  </button>
-                </div>
+              {/* Real-time Database Live Pulse Indicator */}
+              <div className="flex items-center gap-2.5 px-4 py-2 rounded-full border border-border bg-card shadow-xs self-start sm:self-auto">
+                <span
+                  className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                    isRealtimeConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                  }`}
+                />
+                <span className="font-mono text-xs font-semibold text-foreground">
+                  {isRealtimeConnected ? 'DB Synced / Live Connected' : 'Connecting to Central DB...'}
+                </span>
+                {lastSyncTime && (
+                  <span className="text-[10px] font-mono text-muted-foreground hidden sm:inline">
+                    · {lastSyncTime}
+                  </span>
+                )}
               </div>
-
-              {seedSuccessMessage && (
-                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-800 flex items-center gap-2 animate-in fade-in">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span>{seedSuccessMessage}</span>
-                </div>
-              )}
-
-              {resetSuccessMessage && (
-                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-800 flex items-center gap-2 animate-in fade-in">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span>{resetSuccessMessage}</span>
-                </div>
-              )}
             </div>
 
             {/* Top 4 Statutory Metric Cards */}

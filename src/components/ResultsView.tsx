@@ -280,18 +280,6 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
                 <span>Read Constitutional Rules</span>
               </button>
             </div>
-
-            {/* Note for Commission Officer testing */}
-            <p className="text-[11px] font-mono text-muted-foreground pt-4 border-t border-border">
-              Commission Officers can toggle public results live in the{' '}
-              <button
-                type="button"
-                onClick={() => onNavigate('commissioner')}
-                className="text-primary underline font-bold cursor-pointer"
-              >
-                Electoral Commission Portal
-              </button>.
-            </p>
           </div>
         </div>
       </>

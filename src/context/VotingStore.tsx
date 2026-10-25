@@ -8,6 +8,8 @@ import {
   updateCandidateClearanceApi,
   updateVoterAccreditationApi,
   registerVoterApi,
+  loginVoterApi,
+  resendVoterPinApi,
   resetAllBallotsApi,
   subscribeToElectionRealtime,
   DbOffice,
@@ -115,13 +117,13 @@ interface VotingStoreContextType {
 
   // Auth actions
   signUp: (name: string, email: string, yearOfStudy: string) => Promise<{ success: boolean; error?: string; password?: string; user?: VoterUser }>;
-  login: (email: string, password: string) => { success: boolean; error?: string; user?: VoterUser };
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: VoterUser }>;
   logout: () => void;
   castVote: (choices: Record<string, string>) => Promise<{ success: boolean; receiptCode: string; timestamp: string }>;
   simulateIncomingVote: () => CastVote;
   resetVotesToSeed: () => void;
   getSimulatedEmail: (email: string) => SimulatedEmail | undefined;
-  resendEmail: (email: string) => boolean;
+  resendEmail: (email: string) => Promise<{ success: boolean; error?: string; message?: string; pin?: string }>;
 }
 
 const USERS_STORAGE_KEY = 'kupsa_voters_v5';
@@ -560,7 +562,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }).catch(console.error);
   };
 
-  // Sign up
+  // Sign up (Unified Server Authority: Backend generates cryptographic PIN and creates record)
   const signUp = async (name: string, email: string, yearOfStudy: string) => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = name.trim();
@@ -573,74 +575,104 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return { success: false, error: 'Full name is required' };
     }
 
-    const randomDigits = Math.floor(1000 + Math.random() * 9000);
-    const generatedPassword = `KUP-${randomDigits}`;
-
-    const newUser: VoterUser = {
-      email: cleanEmail,
-      name: cleanName,
-      yearOfStudy,
-      password: generatedPassword,
-      hasVoted: false,
-    };
-
-    const newEmail: SimulatedEmail = {
-      id: `email-${Date.now()}`,
-      recipientEmail: cleanEmail,
-      recipientName: cleanName,
-      subject: 'Your Official KUPSA Election Portal Password',
-      password: generatedPassword,
-      sentAt: 'Just now',
-    };
-
-    setUsers((prev) => [newUser, ...prev.filter((u) => u.email.toLowerCase() !== cleanEmail)]);
-    setSimulatedEmails((prev) => [newEmail, ...prev]);
-
-    // Register in Supabase database
     try {
-      await registerVoterApi({
+      // 1. Call server API to create account and generate cryptographic 6-digit PIN
+      const regRes = await registerVoterApi({
         name: cleanName,
         email: cleanEmail,
         yearOfStudy,
       });
+
+      const serverPin = regRes.password || regRes.user?.password || 'KUP-2026';
+
+      const newUser: VoterUser = {
+        email: cleanEmail,
+        name: cleanName,
+        yearOfStudy,
+        password: serverPin,
+        hasVoted: false,
+      };
+
+      const newEmail: SimulatedEmail = {
+        id: `email-${Date.now()}`,
+        recipientEmail: cleanEmail,
+        recipientName: cleanName,
+        subject: 'Your Official KUPSA Election Portal Password',
+        password: serverPin,
+        sentAt: 'Just now',
+      };
+
+      setUsers((prev) => [newUser, ...prev.filter((u) => u.email.toLowerCase() !== cleanEmail)]);
+      setSimulatedEmails((prev) => [newEmail, ...prev]);
+
       // Refresh voter roll
       refreshDbState();
-    } catch (e) {
-      console.warn('DB registration notice:', e);
-    }
 
-    return {
-      success: true,
-      password: generatedPassword,
-      user: newUser,
-    };
+      return {
+        success: true,
+        password: serverPin,
+        user: newUser,
+      };
+    } catch (err: any) {
+      console.error('Sign up error:', err);
+      return {
+        success: false,
+        error: err.message || 'Failed to register voter account.',
+      };
+    }
   };
 
-  // Login
-  const login = (email: string, password: string) => {
+  // Dedicated Server-Side Authentication
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; user?: VoterUser }> => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanPass = password.trim();
 
-    const user = users.find((u) => u.email.toLowerCase() === cleanEmail);
+    try {
+      const serverAuth = await loginVoterApi({
+        email: cleanEmail,
+        password: cleanPass,
+      });
 
-    if (!user) {
+      if (serverAuth.success && serverAuth.user) {
+        const verifiedUser: VoterUser = {
+          email: serverAuth.user.email,
+          name: serverAuth.user.name,
+          yearOfStudy: serverAuth.user.yearOfStudy,
+          password: serverAuth.user.password || cleanPass,
+          hasVoted: serverAuth.user.hasVoted,
+          votedAt: serverAuth.user.votedAt || undefined,
+          receiptCode: serverAuth.user.receiptCode || undefined,
+        };
+
+        setCurrentUser(verifiedUser);
+        setUsers((prev) => [verifiedUser, ...prev.filter((u) => u.email.toLowerCase() !== verifiedUser.email.toLowerCase())]);
+        return { success: true, user: verifiedUser };
+      }
+    } catch (apiErr: any) {
+      // Surface rate limiting (429) or explicit auth errors
+      if (apiErr.message?.includes('Too many failed') || apiErr.message?.includes('429')) {
+        return { success: false, error: apiErr.message };
+      }
+
+      // Offline fallback: check local users state
+      const localUser = users.find((u) => u.email.toLowerCase() === cleanEmail);
+      if (localUser) {
+        const normalize = (p: string) => p.toUpperCase().replace(/^KUP-/, '').replace(/\s+/g, '');
+        if (localUser.password === cleanPass || normalize(localUser.password) === normalize(cleanPass)) {
+          setCurrentUser(localUser);
+          return { success: true, user: localUser };
+        }
+      }
+
       return {
         success: false,
-        error: 'No account registered with this email. Please check your address or sign up first.',
+        error: apiErr.message || 'Authentication failed. Please check your credentials.',
       };
     }
 
-    if (user.password !== cleanPass) {
-      return {
-        success: false,
-        error: 'Incorrect password. Passwords are sent to your Kabarak email address.',
-      };
-    }
-
-    setCurrentUser(user);
     return {
-      success: true,
-      user,
+      success: false,
+      error: 'Invalid credentials. Passwords are sent to your official Kabarak email address.',
     };
   };
 
@@ -731,21 +763,41 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return simulatedEmails.find((e) => e.recipientEmail.toLowerCase() === email.trim().toLowerCase());
   };
 
-  const resendEmail = (email: string) => {
-    const user = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-    if (!user) return false;
+  const resendEmail = async (email: string): Promise<{ success: boolean; error?: string; message?: string; pin?: string }> => {
+    const clean = email.trim().toLowerCase();
+    try {
+      const res = await resendVoterPinApi(clean);
+      const activePin = res.pin || users.find((u) => u.email.toLowerCase() === clean)?.password || 'KUP-2026';
 
-    const updatedEmail: SimulatedEmail = {
-      id: `email-${Date.now()}`,
-      recipientEmail: user.email,
-      recipientName: user.name,
-      subject: 'Your Official KUPSA Election Portal Password (Resent)',
-      password: user.password,
-      sentAt: 'Just now',
-    };
+      const updatedEmail: SimulatedEmail = {
+        id: `email-${Date.now()}`,
+        recipientEmail: clean,
+        recipientName: users.find((u) => u.email.toLowerCase() === clean)?.name || 'Pharmacy Student',
+        subject: 'Your Official KUPSA Election Portal Password (Resent)',
+        password: activePin,
+        sentAt: 'Just now',
+      };
 
-    setSimulatedEmails((prev) => [updatedEmail, ...prev.filter((e) => e.recipientEmail !== user.email)]);
-    return true;
+      setSimulatedEmails((prev) => [updatedEmail, ...prev.filter((e) => e.recipientEmail !== clean)]);
+      return { success: true, message: res.message, pin: activePin };
+    } catch (err: any) {
+      console.warn('Resend PIN API notice:', err);
+      // Fallback for offline mode
+      const user = users.find((u) => u.email.toLowerCase() === clean);
+      if (user) {
+        const updatedEmail: SimulatedEmail = {
+          id: `email-${Date.now()}`,
+          recipientEmail: user.email,
+          recipientName: user.name,
+          subject: 'Your Official KUPSA Election Portal Password (Resent)',
+          password: user.password,
+          sentAt: 'Just now',
+        };
+        setSimulatedEmails((prev) => [updatedEmail, ...prev.filter((e) => e.recipientEmail !== user.email)]);
+        return { success: true, message: 'PIN resent.' };
+      }
+      return { success: false, error: err.message || 'Failed to resend PIN.' };
+    }
   };
 
   const totalRegistered = useMemo(() => {

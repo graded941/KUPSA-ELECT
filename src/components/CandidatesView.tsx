@@ -40,22 +40,24 @@ interface CandidatesViewProps {
 
 // Icon mapping per office ID
 const OFFICE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  chairperson: Award,
-  'vice-chairperson': Users,
+  president: Award,
+  'vice-president': Users,
   'sec-general': FileText,
-  treasurer: Coins,
+  'dep-sec-general': FileText,
   'org-sec': Megaphone,
-  'academic-sec': GraduationCap,
+  treasurer: Coins,
+  'media-officer': Sparkles,
 };
 
 // One-line "what this role does"
 const OFFICE_ONE_LINERS: Record<string, string> = {
-  chairperson: 'Chief executive officer; represents the association to the University Council and School of Pharmacy.',
-  'vice-chairperson': 'Deputizes executive functions, champions student welfare, and coordinates clinical mentorship.',
-  'sec-general': 'Custodian of all official records, public meeting minutes, and association communications.',
-  treasurer: 'Manages association bank accounts, sponsorship revenues, and audited financial statements.',
-  'org-sec': 'Leads pharmacy week outreach caravans, plant tours, sports galas, and social logistics.',
-  'academic-sec': 'Liaises with faculty on exams, peer tutorials, research journals, and laboratory materials.',
+  president: 'Chief Executive Officer; presides over Executive meetings, represents pharmacy students in Faculty Board and University Senate.',
+  'vice-president': 'Deputizes the President; coordinates student welfare, clinical rotations mentorship, and academic appeals.',
+  'sec-general': 'Official custodian of association records, minutes, executive correspondence, and constitutional gazette notices.',
+  'dep-sec-general': 'Assists the Secretary General in institutional archives, committee minutes, and official correspondence.',
+  'org-sec': 'Directs Pharmacy Week outreach, community health camps, industrial pharmaceutical manufacturer tours, and sports.',
+  treasurer: 'Custodian of association funds, annual budgets, Pharmacy Gala books, and certified audited accounts.',
+  'media-officer': 'Directs association public affairs, press statements, digital student bulletins, and the Pharmakon scientific journal.',
 };
 
 const SHORTLIST_STORAGE_KEY = 'kupsa_candidate_shortlist_v1';
@@ -364,7 +366,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
     return () => window.removeEventListener('scroll', handleScroll);
   }, [selectedOffice]);
 
-  const [activeSpyOffice, setActiveSpyOffice] = useState<string>('chairperson');
+  const [activeSpyOffice, setActiveSpyOffice] = useState<string>('president');
 
   // Filter and sort candidates
   const processedOffices = useMemo(() => {
@@ -490,15 +492,6 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
                   <span>{sortOrder === 'alpha' ? 'Sort: A–Z (Statutory)' : 'Sort: Ballot Draw'}</span>
                 </button>
               </div>
-
-              {/* File Nomination Papers Button */}
-              <button
-                onClick={() => setShowNominationModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-full border-2 border-ink bg-card px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-ink hover:text-ink-foreground shrink-0 transition-colors"
-              >
-                <PlusCircle className="h-3.5 w-3.5 text-primary" />
-                <span>File Papers</span>
-              </button>
             </div>
 
             {/* Bottom Row: Office Sliding Navigation Tabs */}

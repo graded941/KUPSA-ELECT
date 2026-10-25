@@ -13,17 +13,17 @@ import {
 
 export const OFFICES: Office[] = [
   {
-    id: 'chairperson',
-    title: 'Chairperson',
-    description: 'Chief executive officer of KUPSA; presides over executive meetings, represents pharmacy students in faculty boards and national pharmaceutical bodies.',
+    id: 'president',
+    title: 'The President',
+    description: 'Chief Executive Officer; presides over Executive meetings, represents pharmacy students in Faculty Board and University Senate.',
     seats: 1,
     constitutionalArticle: 'Article 42(1)',
     term: '2026/2027 Academic Year'
   },
   {
-    id: 'vice-chairperson',
-    title: 'Vice Chairperson',
-    description: 'Deputizes the Chairperson, oversees student welfare, academic mentoring committees, and coordinate professional symposium logistics.',
+    id: 'vice-president',
+    title: 'Vice President',
+    description: 'Deputizes the President; coordinates student welfare, clinical rotations mentorship, and academic appeals.',
     seats: 1,
     constitutionalArticle: 'Article 42(2)',
     term: '2026/2027 Academic Year'
@@ -31,15 +31,15 @@ export const OFFICES: Office[] = [
   {
     id: 'sec-general',
     title: 'Secretary General',
-    description: 'Custodian of all association records, minutes, correspondence, and official publications under constitutional mandate.',
+    description: 'Official custodian of association records, minutes, executive correspondence, and constitutional gazette notices.',
     seats: 1,
     constitutionalArticle: 'Article 42(3)',
     term: '2026/2027 Academic Year'
   },
   {
-    id: 'treasurer',
-    title: 'Treasurer',
-    description: 'Responsible for KUPSA financial records, annual budgets, pharmacy gala accounts, and timely financial reports audited by the Commission and Patron.',
+    id: 'dep-sec-general',
+    title: 'Deputy Secretary General',
+    description: 'Assists the Secretary General in institutional archives, committee minutes, and official correspondence.',
     seats: 1,
     constitutionalArticle: 'Article 42(4)',
     term: '2026/2027 Academic Year'
@@ -47,17 +47,25 @@ export const OFFICES: Office[] = [
   {
     id: 'org-sec',
     title: 'Organizing Secretary',
-    description: 'Coordinates pharmacy week outreach programs, community health camps, pharmaceutical manufacturer industrial visits, and sports.',
+    description: 'Directs Pharmacy Week outreach, community health camps, industrial pharmaceutical manufacturer tours, and sports.',
     seats: 1,
     constitutionalArticle: 'Article 42(5)',
     term: '2026/2027 Academic Year'
   },
   {
-    id: 'academic-sec',
-    title: 'Academic & Research Secretary',
-    description: 'Liaises with School of Pharmacy faculty, organises peer revision groups, scientific abstract seminars, and student research journal entries.',
+    id: 'treasurer',
+    title: 'Treasurer',
+    description: 'Custodian of association funds, annual budgets, Pharmacy Gala books, and certified audited accounts.',
     seats: 1,
     constitutionalArticle: 'Article 42(6)',
+    term: '2026/2027 Academic Year'
+  },
+  {
+    id: 'media-officer',
+    title: 'Media and Publications Officer',
+    description: 'Directs association public affairs, press statements, digital student bulletins, and the Pharmakon scientific journal.',
+    seats: 1,
+    constitutionalArticle: 'Article 42(7)',
     term: '2026/2027 Academic Year'
   }
 ];
@@ -67,7 +75,7 @@ export const CANDIDATES: Candidate[] = [
     id: 'cand-01',
     name: 'Amina Muthoni',
     initials: 'AM',
-    officeId: 'chairperson',
+    officeId: 'president',
     yearOfStudy: 'Bachelor of Pharmacy (Year 4)',
     vettingStatus: 'Vetted & Approved',
     photoPlaceholderBg: '#286746',
@@ -123,7 +131,7 @@ export const CANDIDATES: Candidate[] = [
     id: 'cand-02',
     name: 'Brian Kiprop',
     initials: 'BK',
-    officeId: 'chairperson',
+    officeId: 'president',
     yearOfStudy: 'Bachelor of Pharmacy (Year 4)',
     vettingStatus: 'Vetted & Approved',
     photoPlaceholderBg: '#194a31',
@@ -179,7 +187,7 @@ export const CANDIDATES: Candidate[] = [
     id: 'cand-03',
     name: 'Faith Chebet',
     initials: 'FC',
-    officeId: 'vice-chairperson',
+    officeId: 'vice-president',
     yearOfStudy: 'Bachelor of Pharmacy (Year 3)',
     vettingStatus: 'Vetted & Approved',
     photoPlaceholderBg: '#365314',
@@ -230,7 +238,7 @@ export const CANDIDATES: Candidate[] = [
     id: 'cand-07',
     name: 'Sharon Nekesa',
     initials: 'SN',
-    officeId: 'vice-chairperson',
+    officeId: 'vice-president',
     yearOfStudy: 'Bachelor of Pharmacy (Year 4)',
     vettingStatus: 'Vetted & Approved',
     photoPlaceholderBg: '#0f766e',
@@ -423,6 +431,98 @@ export const CANDIDATES: Candidate[] = [
       }
     ],
     endorsementsCount: 59,
+    complianceChecklist: [
+      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
+      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
+      { rule: 'No active disciplinary infractions', passed: true, reference: 'Art. 42(d)' },
+      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
+    ]
+  },
+  {
+    id: 'cand-08',
+    name: 'Wairimu Njeri',
+    initials: 'WN',
+    officeId: 'dep-sec-general',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 3)',
+    vettingStatus: 'Vetted & Approved',
+    photoPlaceholderBg: '#4338ca',
+    photoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80',
+    manifestoSummary: 'Assisting in rigorous executive record-keeping, committee documentation, and swift correspondence dispatch.',
+    manifestoPillars: [
+      'Assist in digitizing past 5 years of KUPSA constitutional resolutions',
+      'Ensure committee meeting minutes are finalized within 24 hours',
+      'Establish a centralized notice archive accessible by all pharmacy cohorts'
+    ],
+    experience: [
+      'Assistant Secretary, Pharmacy Academic Mentorship Forum',
+      'Peer Counselor and Records Assistant, Health Sciences Guild',
+      'Lead Scribe, 2025 Rift Valley Students Leadership Workshop'
+    ],
+    priorities: [
+      {
+        title: 'Institutional Archive Digitization',
+        desc: 'Scan and index historical constitution amendments and executive records into a searchable vault.',
+        timeline: 'Q1 2027'
+      },
+      {
+        title: 'Sub-Committee Documentation Support',
+        desc: 'Standardize minute templates across all executive standing committees.',
+        timeline: 'Immediate'
+      }
+    ],
+    qa: [
+      {
+        question: 'How will you collaborate with the Secretary General?',
+        answer: 'I will coordinate directly on daily docket maintenance and ensure committee records are synchronized without delay.'
+      }
+    ],
+    endorsementsCount: 62,
+    complianceChecklist: [
+      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
+      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
+      { rule: 'No active disciplinary infractions', passed: true, reference: 'Art. 42(d)' },
+      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
+    ]
+  },
+  {
+    id: 'cand-09',
+    name: 'Stacy Akinyi',
+    initials: 'SA',
+    officeId: 'media-officer',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 2)',
+    vettingStatus: 'Vetted & Approved',
+    photoPlaceholderBg: '#047857',
+    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    manifestoSummary: 'Directing association public affairs, press statements, digital student bulletins, and the Pharmakon scientific journal.',
+    manifestoPillars: [
+      'Publish quarterly peer-reviewed student issues of The Kabarak Pharmakon',
+      'Revamp KUPSA social presence and student press communiqués',
+      'Host inter-school medical podcast and video roundtable series'
+    ],
+    experience: [
+      'Associate Editor, The Kabarak Pharmakon Journal',
+      'Media Team Lead, Kabarak Health Week 2025',
+      'Certified Medical Communications Fellow'
+    ],
+    priorities: [
+      {
+        title: 'Pharmakon Scientific Journal Relaunch',
+        desc: 'Enable student research abstract publication with ISSN accreditation.',
+        timeline: 'Q1 2027'
+      },
+      {
+        title: 'Digital Media Newsroom',
+        desc: 'Deliver weekly graphic summaries of pharmacy opportunities and school updates.',
+        timeline: 'Immediate'
+      }
+    ],
+    qa: [
+      {
+        question: 'How will you elevate student research visibility?',
+        answer: 'By partnering with the Faculty Dean to feature outstanding pharmacy student abstracts in both digital bulletins and national forums.'
+      }
+    ],
+    endorsementsCount: 71,
     complianceChecklist: [
       { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
       { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },

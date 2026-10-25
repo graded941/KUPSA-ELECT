@@ -1,14 +1,8 @@
 import React, { useState } from 'react';
 import {
-  FileText,
   Send,
   X,
   CheckCircle2,
-  AlertCircle,
-  Clock,
-  ShieldCheck,
-  Building,
-  Upload
 } from 'lucide-react';
 import { StudentRecord } from '../types';
 
@@ -26,10 +20,7 @@ export const HelpdeskAppealModal: React.FC<HelpdeskAppealModalProps> = ({
   const [regNo, setRegNo] = useState<string>(prefilledStudent?.regNo || '');
   const [studentName, setStudentName] = useState<string>(prefilledStudent?.name || '');
   const [email, setEmail] = useState<string>(prefilledStudent?.email || '');
-  const [phone, setPhone] = useState<string>('+254 7');
-  const [issueType, setIssueType] = useState<string>('semester-registration');
   const [notes, setNotes] = useState<string>('');
-  const [attachedProof, setAttachedProof] = useState<string>('Kabarak_Fee_Receipt_2026.pdf');
   const [submittedTicket, setSubmittedTicket] = useState<{
     ticketId: string;
     submittedAt: string;
@@ -132,11 +123,6 @@ export const HelpdeskAppealModal: React.FC<HelpdeskAppealModalProps> = ({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs">
-            <p className="text-[#58675e] leading-relaxed">
-              If your student status shows "Ineligible" or "Action Required", submit your official
-              details below. The Commission Secretariat reviews registrar proofs before poll closure.
-            </p>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="font-bold text-[#17271f]">Student Full Name</label>
@@ -163,58 +149,28 @@ export const HelpdeskAppealModal: React.FC<HelpdeskAppealModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="font-bold text-[#17271f]">Kabarak Student Email</label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="student@kabarak.ac.ke"
-                  className="w-full bg-[#f7f9f6] border border-[#e1e7df] rounded-lg px-3 py-2.5 text-sm sm:text-xs min-h-[42px] focus:outline-none focus:border-[#286746]"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-[#17271f]">Discrepancy Category</label>
-                <select
-                  value={issueType}
-                  onChange={(e) => setIssueType(e.target.value)}
-                  className="w-full bg-[#f7f9f6] border border-[#e1e7df] rounded-lg px-3 py-2.5 text-sm sm:text-xs min-h-[42px] focus:outline-none focus:border-[#286746]"
-                >
-                  <option value="semester-registration">
-                    Paid-up but not showing on current roll
-                  </option>
-                  <option value="faculty-transfer">
-                    Recent inter-faculty transfer to Pharmacy
-                  </option>
-                  <option value="attachment-leave">
-                    Returning from clinical attachment / deferment
-                  </option>
-                  <option value="dues-clearance">KUPSA subscription payment pending receipt</option>
-                </select>
-              </div>
-            </div>
-
             <div className="space-y-1">
-              <label className="font-bold text-[#17271f]">Discrepancy Details & Receipt Ref</label>
-              <textarea
-                rows={2}
+              <label className="font-bold text-[#17271f]">Kabarak Student Email</label>
+              <input
+                type="email"
                 required
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="State your fee payment receipt number or Dean approval date..."
-                className="w-full bg-[#f7f9f6] border border-[#e1e7df] rounded-lg p-3 text-sm sm:text-xs focus:outline-none focus:border-[#286746]"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="student@kabarak.ac.ke"
+                className="w-full bg-[#f7f9f6] border border-[#e1e7df] rounded-lg px-3 py-2.5 text-sm sm:text-xs min-h-[42px] focus:outline-none focus:border-[#286746]"
               />
             </div>
 
-            <div className="p-3 bg-[#fafcfa] border border-[#e1e7df] rounded-xl flex items-center justify-between text-[11px]">
-              <div className="flex items-center gap-2 text-[#58675e]">
-                <FileText className="w-4 h-4 text-[#286746]" />
-                <span>Simulated Proof Attached: {attachedProof}</span>
-              </div>
-              <span className="text-[#286746] font-bold">Attached ✓</span>
+            <div className="space-y-1">
+              <label className="font-bold text-[#17271f]">Discrepancy Details</label>
+              <textarea
+                rows={3}
+                required
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="State your discrepancy details or reason for appeal..."
+                className="w-full bg-[#f7f9f6] border border-[#e1e7df] rounded-lg p-3 text-sm sm:text-xs focus:outline-none focus:border-[#286746]"
+              />
             </div>
 
             <div className="pt-2 border-t border-[#e1e7df] flex items-center justify-end gap-3 pb-safe">
