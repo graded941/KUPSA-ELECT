@@ -3,7 +3,7 @@ import { ViewId } from '../types';
 import { CONSTITUTIONAL_ARTICLES } from '../data/election';
 import { PageIntro } from './site-shell';
 import { Minus, Plus, BookOpen, ShieldCheck, ArrowRight } from 'lucide-react';
-import { HelpdeskAppealModal } from './HelpdeskAppealModal';
+import { ConstitutionalPetitionModal } from './ConstitutionalPetitionModal';
 
 interface RulesViewProps {
   onNavigate: (view: ViewId) => void;
@@ -107,8 +107,8 @@ export function RulesView({ onNavigate, onOpenAudit }: RulesViewProps) {
         </div>
       </div>
 
-      {/* Interactive Appeal Filing Modal */}
-      <HelpdeskAppealModal
+      {/* Constitutional Article 51 Petition & Appeal Filing Modal */}
+      <ConstitutionalPetitionModal
         isOpen={isAppealModalOpen}
         onClose={() => setIsAppealModalOpen(false)}
       />

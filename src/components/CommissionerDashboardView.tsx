@@ -938,15 +938,30 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
+                  disabled={isResettingBallots || isLoadingDb}
                   onClick={async () => {
-                    if (window.confirm('Are you sure you want to purge all ballots for live polling day? This cannot be undone.')) {
-                      await resetAllBallots();
-                      alert('Ballots purged. Database clean for Polling Day.');
+                    if (window.confirm('Are you sure you want to purge all ballots for live polling day? This will clear all votes and reset student voting statuses. This cannot be undone.')) {
+                      setIsResettingBallots(true);
+                      try {
+                        await resetAllBallots();
+                        alert('All ballots successfully purged. Voter participation flags reset. Database is clean for Polling Day.');
+                      } catch (err: any) {
+                        alert(`Failed to purge ballots: ${err.message || 'Server error'}`);
+                      } finally {
+                        setIsResettingBallots(false);
+                      }
                     }
                   }}
-                  className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-xs font-mono text-destructive hover:bg-destructive/10 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                  className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-xs font-mono text-destructive hover:bg-destructive/10 transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span>Purge All Ballots (Start Live Polling Clean)</span>
+                  {isResettingBallots ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Purging Ballots & Resetting Registry...</span>
+                    </>
+                  ) : (
+                    <span>Purge All Ballots (Start Live Polling Clean)</span>
+                  )}
                 </button>
               </div>
             </div>

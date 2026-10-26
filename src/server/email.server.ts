@@ -138,14 +138,14 @@ export function generateElectionCalendarInvite(params: {
 }
 
 /**
- * Generates an official PDF Voter Polling Card (Voter-Pass-[REG].pdf) using jsPDF
+ * Generates an official PDF Voter Polling Slip (Voter-Pass-[REG].pdf) using jsPDF
  */
 export async function generateVoterPassPdf(data: {
   studentName: string;
   regNo: string;
   yearOfStudy: string;
   passwordCode: string;
-  pollingStation: string;
+  portalUrl?: string;
 }): Promise<Buffer> {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -170,9 +170,9 @@ export async function generateVoterPassPdf(data: {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(212, 160, 23);
-  doc.text('OFFICIAL VOTER POLLING PASS · 2026', 52.5, 17, { align: 'center' });
+  doc.text('OFFICIAL VOTER POLLING PASS · 2026/2027', 52.5, 17, { align: 'center' });
   doc.setTextColor(220, 220, 220);
-  doc.text('Chapter Six Statutory Accreditation', 52.5, 22, { align: 'center' });
+  doc.text('School of Pharmacy, Kabarak University', 52.5, 22, { align: 'center' });
 
   // Body content
   doc.setTextColor(20, 20, 20);
@@ -182,39 +182,50 @@ export async function generateVoterPassPdf(data: {
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(`Full Name:  ${data.studentName}`, 12, 45);
-  doc.text(`Reg Number: ${data.regNo}`, 12, 51);
-  doc.text(`Cohort:     ${data.yearOfStudy}`, 12, 57);
-  doc.text(`Station:    ${data.pollingStation}`, 12, 63);
+  doc.text(`Full Name:   ${data.studentName}`, 12, 45);
+  doc.text(`Reg Number:  ${data.regNo}`, 12, 51);
+  doc.text(`Cohort:      ${data.yearOfStudy}`, 12, 57);
+  doc.text(`Voting Mode: Online Portal (100% Digital & Secret)`, 12, 63);
+  doc.text(`Poll Date:   Friday, 6 Nov 2026 (08:00 - 17:00 EAT)`, 12, 69);
 
   // Secret Password Box
   doc.setFillColor(247, 246, 242);
   doc.setDrawColor(212, 160, 23);
-  doc.roundedRect(12, 70, 81, 20, 3, 3, 'FD');
+  doc.roundedRect(12, 75, 81, 22, 3, 3, 'FD');
 
-  doc.setFontSize(7);
+  doc.setFontSize(7.5);
   doc.setTextColor(100, 100, 100);
-  doc.text('ONE-TIME VOTING PORTAL PASSCODE', 52.5, 76, { align: 'center' });
+  doc.setFont('helvetica', 'bold');
+  doc.text('ONE-TIME VOTING PORTAL PASSCODE', 52.5, 82, { align: 'center' });
 
-  doc.setFontSize(14);
+  doc.setFontSize(15);
   doc.setFont('courier', 'bold');
   doc.setTextColor(194, 65, 12); // Deep Amber
-  doc.text(data.passwordCode, 52.5, 84, { align: 'center' });
+  doc.text(data.passwordCode, 52.5, 91, { align: 'center' });
+
+  // Portal Link & Instructions
+  const portalUrl = (data.portalUrl || 'https://kupsaelect.vercel.app').trim();
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(11, 27, 61);
+  doc.text(`Portal: ${portalUrl}`, 52.5, 104, { align: 'center' });
 
   // Security Note
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7);
   doc.setTextColor(110, 110, 110);
-  doc.text('Present this pass or your credentials at the polling desk.', 52.5, 96, { align: 'center' });
-  doc.text('Ballot selections are 100% secret under Article 41(3).', 52.5, 100, { align: 'center' });
+  doc.text('Sign in to the voting portal using your student email and this secret passcode.', 52.5, 113, { align: 'center' });
+  doc.text('Ballot selections are 100% confidential and anonymized under Article 41(3).', 52.5, 118, { align: 'center' });
+  doc.text('This passcode is single-use and will be permanently sealed upon voting.', 52.5, 123, { align: 'center' });
 
   // Footer bar
   doc.setFillColor(240, 240, 240);
-  doc.rect(0, 140, 105, 8, 'F');
+  doc.rect(0, 137, 105, 11, 'F');
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
-  doc.setTextColor(120, 120, 120);
-  doc.text('Kabarak University Pharmacy Students Association · Verified Roll', 52.5, 145, { align: 'center' });
+  doc.setTextColor(100, 100, 100);
+  doc.text('Kabarak University Pharmacy Students Association (KUPSA)', 52.5, 142, { align: 'center' });
+  doc.text('School of Pharmacy, Kabarak University · Verified Voter Roll', 52.5, 145.5, { align: 'center' });
 
   const arrayBuffer = doc.output('arraybuffer');
   return Buffer.from(arrayBuffer);
@@ -244,36 +255,27 @@ export async function sendVoterPassEmail(payload: VoterPassPayload): Promise<{
   }
 
   try {
-    const portalUrl = payload.portalUrl || process.env.SITE_URL || 'https://kabarak.ac.ke';
-    const pollingStation = payload.pollingStation || 'School of Pharmacy Complex, Kabarak University';
+    const portalUrl = (payload.portalUrl || process.env.SITE_URL || 'https://kupsaelect.vercel.app').trim();
 
-    // 1. Generate QR Code Buffer for inline CID embedding
-    const qrData = `KUPSA-VOTER:${payload.regNo}:${payload.passwordCode}`;
-    const qrBuffer = await QRCode.toBuffer(qrData, {
-      width: 260,
-      margin: 1,
-      color: { dark: '#0B1B3D', light: '#FFFFFF' },
-    });
-
-    // 2. Generate PDF Voter Card Pass
+    // 1. Generate PDF Voter Polling Slip
     const pdfBuffer = await generateVoterPassPdf({
       studentName: payload.studentName,
       regNo: payload.regNo,
       yearOfStudy: payload.yearOfStudy,
       passwordCode: payload.passwordCode,
-      pollingStation,
+      portalUrl,
     });
 
-    // 3. Generate iCalendar RFC 5545 Invite
+    // 2. Generate iCalendar RFC 5545 Invite
     const icsContent = generateElectionCalendarInvite({
-      eventTitle: 'KUPSA General Elections 2026/2027',
-      description: `Official student polling for the Kabarak University Pharmacy Students Association. Your Voter Passcode is ${payload.passwordCode}.`,
-      location: pollingStation,
-      startUtc: '20261106T050000Z', // 08:00 EAT
-      endUtc: '20261106T140000Z',   // 17:00 EAT
+      eventTitle: 'KUPSA General Elections 2026/2027 (Online Polling)',
+      description: `Official student online polling for the Kabarak University Pharmacy Students Association. Cast your secret ballot on the portal: ${portalUrl}. Your Voter Passcode is: ${payload.passwordCode}.`,
+      location: 'Official Online Portal · School of Pharmacy, Kabarak University',
+      startUtc: '20261106T050000Z', // 08:00 EAT (Friday, 6 Nov 2026)
+      endUtc: '20261106T140000Z',   // 17:00 EAT (Friday, 6 Nov 2026)
     });
 
-    // 4. Schema.org JSON-LD microdata for interactive Gmail card
+    // 3. Schema.org JSON-LD microdata for interactive card display in Gmail
     const jsonLd = {
       '@context': 'https://schema.org',
       '@type': 'EventReservation',
@@ -288,69 +290,63 @@ export async function sendVoterPassEmail(payload: VoterPassPayload): Promise<{
         name: 'KUPSA General Elections 2026/2027',
         startDate: '2026-11-06T08:00:00+03:00',
         endDate: '2026-11-06T17:00:00+03:00',
+        eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
         location: {
-          '@type': 'Place',
-          name: pollingStation,
-          address: 'Kabarak University Main Campus, Nakuru, Kenya',
+          '@type': 'VirtualLocation',
+          name: 'KUPSA Online Voting Portal',
+          url: portalUrl,
         },
       },
     };
 
-    // 5. Build Multipart HTML Body
+    // 4. Build Responsive Branded HTML Body (Zero QR code, Fully Online)
     const cleanRegCode = payload.regNo.replace(/[^a-zA-Z0-9]/g, '-');
     const htmlBody = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Official KUPSA Election Voter Pass</title>
+  <title>Your KUPSA Voter Pass</title>
   <script type="application/ld+json">
     ${JSON.stringify(jsonLd)}
   </script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f7f6f2; margin: 0; padding: 24px; color: #1c1917; }
     .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e7e5e4; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
-    .header { background: #0b1b3d; padding: 28px; text-align: center; color: #ffffff; }
+    .header { background: #0b1b3d; padding: 28px 24px; text-align: center; color: #ffffff; }
     .header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
     .header p { margin: 6px 0 0; font-size: 13px; color: #d4a017; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
     .body { padding: 32px 28px; }
     .greeting { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #0b1b3d; }
     .text { font-size: 14px; line-height: 1.6; color: #44403c; margin-bottom: 20px; }
-    .pass-box { background: #fafaf9; border: 2px dashed #d4a017; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0; }
-    .pass-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #78716c; margin-bottom: 8px; font-weight: 600; }
-    .pass-code { font-family: monospace; font-size: 28px; font-weight: 800; letter-spacing: 0.15em; color: #c2410c; background: #ffffff; padding: 10px 20px; border-radius: 8px; border: 1px solid #e7e5e4; display: inline-block; }
-    .qr-container { margin: 20px 0 8px; text-align: center; }
-    .qr-container img { width: 140px; height: 140px; border-radius: 8px; border: 1px solid #e7e5e4; }
-    .badge { display: inline-block; padding: 4px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 9999px; font-size: 12px; font-weight: 600; margin-top: 10px; }
-    .details-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px; }
-    .details-table td { padding: 8px 0; border-bottom: 1px solid #f0eee9; }
-    .details-label { color: #78716c; width: 40%; font-weight: 500; }
+    .pass-box { background: #fafaf9; border: 2px dashed #d4a017; border-radius: 12px; padding: 24px 20px; text-align: center; margin: 24px 0; }
+    .pass-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #78716c; margin-bottom: 10px; font-weight: 700; }
+    .pass-code { font-family: 'Courier New', Courier, monospace; font-size: 30px; font-weight: 800; letter-spacing: 0.18em; color: #c2410c; background: #ffffff; padding: 12px 24px; border-radius: 8px; border: 1px solid #e7e5e4; display: inline-block; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+    .badge { display: inline-block; padding: 4px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 9999px; font-size: 12px; font-weight: 600; margin-top: 14px; }
+    .details-table { width: 100%; border-collapse: collapse; margin: 24px 0 20px; font-size: 13px; }
+    .details-table td { padding: 9px 0; border-bottom: 1px solid #f0eee9; }
+    .details-label { color: #78716c; width: 38%; font-weight: 500; }
     .details-val { color: #1c1917; font-weight: 600; font-family: monospace; }
     .cta-btn { display: block; text-align: center; background: #0b1b3d; color: #ffffff !important; text-decoration: none; padding: 14px 24px; border-radius: 9999px; font-weight: 600; font-size: 14px; margin-top: 24px; }
-    .footer { padding: 20px 28px; background: #f5f5f4; border-top: 1px solid #e7e5e4; font-size: 12px; color: #78716c; text-align: center; }
+    .footer { padding: 20px 28px; background: #f5f5f4; border-top: 1px solid #e7e5e4; font-size: 12px; color: #78716c; text-align: center; line-height: 1.5; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="header">
       <h1>KUPSA Electoral Commission</h1>
-      <p>Official Student Polling Access Pass · 2026/2027</p>
+      <p>Official Student Voting Pass · 2026/2027</p>
     </div>
     <div class="body">
       <div class="greeting">Hello, ${payload.studentName}</div>
       <p class="text">
-        Your student accreditation for the <strong>2026 KUPSA General Elections</strong> has been verified. Below is your official one-time access passcode and polling check-in pass:
+        Your student accreditation for the <strong>2026 KUPSA General Elections</strong> has been verified. The election is conducted entirely online through the official portal. Below is your official one-time access passcode:
       </p>
 
       <div class="pass-box">
-        <div class="pass-label">Your Secret Portal Password</div>
+        <div class="pass-label">Your Secret Voting Passcode</div>
         <div class="pass-code">${payload.passwordCode}</div>
         <div>
-          <span class="badge">Accredited: ${payload.regNo}</span>
-        </div>
-
-        <div class="qr-container">
-          <img src="cid:voter-qr" alt="Voter Check-in QR Code" />
-          <p style="font-size: 11px; color: #78716c; margin: 6px 0 0;">Scan at Physical Desk or Enter Online</p>
+          <span class="badge">Accredited · ${payload.regNo}</span>
         </div>
       </div>
 
@@ -368,41 +364,103 @@ export async function sendVoterPassEmail(payload: VoterPassPayload): Promise<{
           <td class="details-val">${payload.yearOfStudy}</td>
         </tr>
         <tr>
-          <td class="details-label">Polling Station:</td>
-          <td class="details-val">${pollingStation}</td>
+          <td class="details-label">Voting Channel:</td>
+          <td class="details-val">Official Online Portal (100% Digital)</td>
+        </tr>
+        <tr>
+          <td class="details-label">Polling Schedule:</td>
+          <td class="details-val">Friday, 6 Nov 2026 · 08:00 – 17:00 EAT</td>
         </tr>
       </table>
 
       <p class="text" style="font-size: 13px; color: #78716c;">
         <strong>Constitutional Privacy Notice:</strong><br/>
-        • Your ballot is 100% secret and detached from your student identity under Article 41(3).<br/>
-        • Once you cast your ballot, this access passcode is permanently sealed.<br/>
-        • A PDF copy of your polling card and an election calendar reminder are attached to this email.
+        • Your ballot is 100% secret and anonymized under Article 41(3).<br/>
+        • Choices are decoupled from voter identities via cryptographic hashing.<br/>
+        • Once you cast your ballot, this single-use passcode is permanently locked.<br/>
+        • An official PDF copy of your polling slip and an election calendar reminder are attached.
       </p>
 
       <a href="${portalUrl}" class="cta-btn">Enter Voting Portal</a>
     </div>
     <div class="footer">
       Kabarak University Pharmacy Students Association (KUPSA)<br/>
-      Independent Electoral Commission · Chapter Six Statutory Authority
+      School of Pharmacy, Kabarak University · Chapter Six Statutory Authority
     </div>
   </div>
 </body>
 </html>`;
 
-    // 6. Send Mail via Nodemailer Transporter
+    // 5. Comprehensive Plain-Text Fallback (Matching PDF & HTML Slip)
+    const textBody = [
+      '============================================================',
+      'KUPSA ELECTORAL COMMISSION',
+      'Kabarak University Pharmacy Students Association',
+      'Official Voter Pass · General Elections 2026/2027',
+      '============================================================',
+      '',
+      `Hello, ${payload.studentName},`,
+      '',
+      'Your student accreditation for the 2026 KUPSA General Elections has been confirmed.',
+      'The election is conducted entirely online through the official KUPSA Voting Portal.',
+      '',
+      '------------------------------------------------------------',
+      'ACCREDITED VOTER DETAILS',
+      '------------------------------------------------------------',
+      `Student Name:     ${payload.studentName}`,
+      `Reg Number:       ${payload.regNo}`,
+      `Academic Cohort:  ${payload.yearOfStudy}`,
+      `Voting Channel:   Official Online Portal (100% Digital & Secret)`,
+      `Polling Schedule: Friday, 6 November 2026 · 08:00 to 17:00 EAT`,
+      '',
+      '------------------------------------------------------------',
+      'YOUR SECRET ONE-TIME VOTING PASSCODE',
+      '------------------------------------------------------------',
+      `>>> ${payload.passwordCode} <<<`,
+      '',
+      '------------------------------------------------------------',
+      'HOW TO CAST YOUR VOTE',
+      '------------------------------------------------------------',
+      `1. Access the official voting portal: ${portalUrl}`,
+      `2. Enter your student email (${payload.to}) and your secret passcode above.`,
+      '3. Review certified candidate profiles and submit your sealed ballot.',
+      '',
+      'CONSTITUTIONAL PRIVACY GUARANTEE:',
+      '• Under Article 41(3), your vote is 100% secret and anonymized.',
+      '• Selections are decoupled from voter identities via cryptographic hashing.',
+      '• Once submitted, your one-time passcode is permanently expired.',
+      '',
+      `An official PDF polling slip (Voter-Pass-${cleanRegCode}.pdf) is attached to this email.`,
+      '',
+      'School of Pharmacy, Kabarak University',
+      'KUPSA Independent Electoral Commission · Chapter Six Statutory Authority',
+      '============================================================',
+    ].join('\n');
+
+    // 6. SPF/DKIM-compliant sender resolution
+    const senderEmail = creds.user;
+    const replyToEmail = process.env.SUPPORT_EMAIL || creds.user;
+
+    // 7. Dispatch Mail with clean subject and PDF polling slip
     const info = await transporter.sendMail({
-      from: creds.from,
+      from: `"KUPSA Electoral Commission" <${senderEmail}>`,
+      replyTo: `"KUPSA Elections Support" <${replyToEmail}>`,
+      sender: senderEmail,
+      envelope: {
+        from: senderEmail,
+        to: payload.to,
+      },
+      headers: {
+        'X-Mailer': 'KUPSA Electoral System 2026/2027',
+        'X-Auto-Response-Suppress': 'All',
+        'Auto-Submitted': 'auto-generated',
+        'List-Unsubscribe': `<mailto:${replyToEmail}?subject=Unsubscribe>`,
+      },
       to: payload.to,
-      subject: `Official KUPSA Election Voter Pass — ${payload.studentName} (${payload.regNo})`,
+      subject: 'Your KUPSA Voter Pass – Voting Opens Fri, 6 Nov',
       html: htmlBody,
-      text: `Hello ${payload.studentName},\n\nYour KUPSA General Election passcode is: ${payload.passwordCode}\nReg Number: ${payload.regNo}\nCohort: ${payload.yearOfStudy}\nStation: ${pollingStation}\n\nLogin at: ${portalUrl}`,
+      text: textBody,
       attachments: [
-        {
-          filename: 'voter-checkin-qr.png',
-          content: qrBuffer,
-          cid: 'voter-qr', // matches <img src="cid:voter-qr" />
-        },
         {
           filename: `Voter-Pass-${cleanRegCode}.pdf`,
           content: pdfBuffer,

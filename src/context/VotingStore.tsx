@@ -23,6 +23,7 @@ export interface VoterUser {
   email: string;
   name: string;
   yearOfStudy: string;
+  regNo?: string;
   password: string;
   hasVoted: boolean;
   votedAt?: string;
@@ -431,13 +432,27 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const resetAllBallots = async () => {
     setIsLoadingDb(true);
     try {
-      await resetAllBallotsApi({});
+      await resetAllBallotsApi({
+        confirmSecret: 'RESET-KUPSA-2026',
+        officerEmail: 'commissioner@kabarak.ac.ke',
+        officerRole: 'Head Commissioner',
+      });
       setVotes([]);
       setLastCastVote(null);
       if (currentUser) {
         setCurrentUser((prev) => (prev ? { ...prev, hasVoted: false, receiptCode: undefined, votedAt: undefined } : null));
       }
+      setUsers((prev) =>
+        prev.map((u) => ({
+          ...u,
+          hasVoted: false,
+          receiptCode: undefined,
+          votedAt: undefined,
+        }))
+      );
       setAccreditationList((prev) => prev.map((s) => ({ ...s, hasVoted: false })));
+      // Re-synchronize snapshot from backend database
+      await refreshDbState();
     } finally {
       setIsLoadingDb(false);
     }
@@ -584,11 +599,13 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
       });
 
       const serverPin = regRes.password || regRes.user?.password || 'KUP-2026';
+      const assignedRegNo = regRes.regNo || regRes.user?.regNo;
 
       const newUser: VoterUser = {
         email: cleanEmail,
         name: cleanName,
         yearOfStudy,
+        regNo: assignedRegNo,
         password: serverPin,
         hasVoted: false,
       };

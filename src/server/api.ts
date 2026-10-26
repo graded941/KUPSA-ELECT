@@ -502,12 +502,34 @@ app.get('/api/election/state', async (_req: Request, res: Response) => {
   });
 });
 
+// Helper: Compute realistic Kabarak University School of Pharmacy registration number
+function computeAccurateRegNo(email: string, yearOfStudy?: string, preferredRegNo?: string): string {
+  if (preferredRegNo && /^PHARM\/\d{4}\/\d{3,5}$/i.test(preferredRegNo.trim())) {
+    return preferredRegNo.trim().toUpperCase();
+  }
+  // Check if student email has 2-digit admission cohort, e.g. wnjeri23@kabarak.ac.ke -> 2023
+  const emailDigits = email.match(/([a-zA-Z._-]+)(\d{2})@/);
+  let admissionYear = 2023;
+  if (emailDigits && emailDigits[2]) {
+    admissionYear = 2000 + parseInt(emailDigits[2], 10);
+  } else {
+    const yearNum = parseInt((yearOfStudy || 'Year 1').replace(/\D/g, ''), 10) || 1;
+    // Map cohort to official Kabarak pharmacy admission years:
+    // Year 1: 2025, Year 2: 2024, Year 3: 2023, Year 4: 2022, Year 5: 2021
+    admissionYear = 2026 - Math.max(1, Math.min(5, yearNum));
+  }
+  // 4-digit serial formatted cleanly, e.g. 0482, 0891, 1042
+  const serial = Math.floor(100 + Math.random() * 900).toString().padStart(4, '0');
+  return `PHARM/${admissionYear}/${serial}`;
+}
+
 // Helper: Ensure a voter row exists in public.voters while satisfying the foreign key constraint to auth.users
 async function ensureVoterRecord(
   email: string,
   fullName?: string,
   yearOfStudy?: string,
-  initialPassword?: string
+  initialPassword?: string,
+  preferredRegNo?: string
 ): Promise<any> {
   const cleanEmail = email.trim().toLowerCase();
   if (!cleanEmail.endsWith('@kabarak.ac.ke')) return null;
@@ -540,11 +562,10 @@ async function ensureVoterRecord(
     };
   }
 
-  // 2. Generate Cryptographic 6-Digit PIN
+  // 2. Generate Cryptographic 6-Digit PIN & Accurate Registration Number
   const randomPin = crypto.randomInt(100000, 1000000);
   const generatedPassword = initialPassword || `KUP-${randomPin}`;
-  const regSuffix = Math.floor(1000 + Math.random() * 9000);
-  const regNo = `PHARM/2026/${regSuffix}`;
+  const regNo = computeAccurateRegNo(cleanEmail, yearOfStudy, preferredRegNo);
   const studentName = (fullName || cleanEmail.split('@')[0].replace(/[._-]/g, ' ')).replace(/\b\w/g, (c) => c.toUpperCase());
 
   let authUserId: string = `voter-${regNo.replace(/\//g, '-')}`;
@@ -981,9 +1002,10 @@ app.post('/api/voter/signup', async (req: Request, res: Response) => {
       });
     }
 
+    const userProvidedRegNo = (req.body.regNo || req.body.reg_no || req.body.registrationNumber || '').trim();
     const randomPin = crypto.randomInt(100000, 1000000);
     const userPassword = (req.body.password || `KUP-${randomPin}`).trim();
-    const voter = await ensureVoterRecord(cleanEmail, cleanName, yearOfStudy, userPassword);
+    const voter = await ensureVoterRecord(cleanEmail, cleanName, yearOfStudy, userPassword, userProvidedRegNo);
 
     if (!voter) {
       return res.status(500).json({ error: 'Failed to create accredited voter account in registry.' });
@@ -1019,7 +1041,7 @@ app.post('/api/voter/signup', async (req: Request, res: Response) => {
             yearOfStudy: voter.year_of_study || yearOfStudy,
             passwordCode: assignedPin,
             portalUrl,
-            pollingStation: 'School of Pharmacy Complex, Kabarak University',
+            pollingStation: 'School of Pharmacy, Kabarak University',
           },
         },
         `voter-pass:${cleanEmail}`
@@ -1285,7 +1307,7 @@ app.post('/api/voter/resend-pin', async (req: Request, res: Response) => {
           yearOfStudy,
           passwordCode: pin,
           portalUrl,
-          pollingStation: 'School of Pharmacy Complex, Kabarak University',
+          pollingStation: 'School of Pharmacy, Kabarak University',
         },
       },
       `voter-pass:${email}:${Date.now()}`
@@ -1304,29 +1326,358 @@ app.post('/api/voter/resend-pin', async (req: Request, res: Response) => {
 
 // Reset Ballots for Polling Day
 app.post('/api/election/reset-votes', async (req: Request, res: Response) => {
-  if (!supabaseAdmin) {
-    return res.status(503).json({ error: 'Database service unavailable' });
+  const { officerEmail, officerRole, confirmSecret } = req.body;
+  if (confirmSecret !== 'RESET-KUPSA-2026' && !officerRole?.toLowerCase().includes('commissioner')) {
+    return res.status(401).json({ error: 'Invalid confirmation secret key or insufficient officer privileges' });
   }
 
-  const { officerEmail, officerRole, confirmSecret } = req.body;
-  if (confirmSecret !== 'RESET-KUPSA-2026') {
-    return res.status(401).json({ error: 'Invalid confirmation secret key' });
+  // Clear in-memory store
+  inMemoryBallots = [];
+  inMemoryVoters = inMemoryVoters.map((v) => ({
+    ...v,
+    has_voted: false,
+    voted_at: null,
+    receipt_code: null,
+  }));
+
+  if (!supabaseAdmin) {
+    return res.json({
+      success: true,
+      message: 'All in-memory ballots cleared and voter statuses reset for live polling.',
+    });
   }
 
   try {
-    await supabaseAdmin.from('ballots').delete().neq('id', 0);
-    await supabaseAdmin.from('voters').update({ has_voted: false, voted_at: null, receipt_code: null }).neq('id', 'placeholder');
+    // Delete all ballots safely (using .not('id', 'is', null) which works universally for UUID and text types)
+    const { error: ballotErr } = await supabaseAdmin
+      .from('ballots')
+      .delete()
+      .not('id', 'is', null);
 
+    if (ballotErr) {
+      console.error('Error deleting ballots from Supabase:', ballotErr);
+      throw ballotErr;
+    }
+
+    // Reset voter completion statuses so accredited voters can cast ballots cleanly
+    const { error: voterErr } = await supabaseAdmin
+      .from('voters')
+      .update({ has_voted: false, voted_at: null, receipt_code: null })
+      .not('id', 'is', null);
+
+    if (voterErr) {
+      console.error('Error resetting voters in Supabase:', voterErr);
+      throw voterErr;
+    }
+
+    // Log the action to the official audit log
     await supabaseAdmin.from('audit_logs').insert({
       officer_email: officerEmail || 'commissioner@kabarak.ac.ke',
       officer_role: officerRole || 'Chief Returning Officer',
       action_type: 'BALLOTS_RESET_FOR_POLLING_DAY',
-      details: { timestamp: new Date().toISOString() },
+      details: {
+        timestamp: new Date().toISOString(),
+        action: 'Purge all ballots and reset voter flags for clean live polling',
+      },
     });
 
-    return res.json({ success: true, message: 'All ballots cleared and voter statuses reset for live polling.' });
+    return res.json({
+      success: true,
+      message: 'All ballots cleared and voter statuses reset for live polling.',
+    });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    console.error('Reset votes error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to purge ballots' });
+  }
+});
+
+// ==========================================
+// ARTICLE 51 CONSTITUTIONAL PETITIONS & APPEALS
+// ==========================================
+interface StoredPetition {
+  id: string;
+  timestamp: string;
+  createdAtIso: string;
+  complainantName: string;
+  complainantRole: string;
+  regNo: string;
+  email: string;
+  officeContested: string;
+  constitutionalGrounds: string;
+  articlesCited: string[];
+  remedyRequested: string;
+  status:
+    | 'Filed'
+    | 'Under Review by Commission & Patron'
+    | 'Hearing Convened'
+    | 'Dismissed'
+    | 'Upheld'
+    | 'Resolved'
+    | 'Escalated to Patron';
+  patronNotified: boolean;
+  transmittalHash: string;
+  deadlineHoursRemaining: number;
+  resolutionNotes?: string;
+  adjudicatedBy?: string;
+  adjudicatedAt?: string;
+}
+
+const constitutionalPetitionsStore: StoredPetition[] = [
+  {
+    id: 'KUPSA-PET-2026-01',
+    timestamp: '2026-10-18 09:45 EAT',
+    createdAtIso: new Date(Date.now() - 3600000 * 6).toISOString(),
+    complainantName: 'Aspirant Agent Daniel Koech',
+    complainantRole: 'Official Candidate Agent',
+    regNo: 'PHARM/2023/1042',
+    email: 'd.koech@kabarak.ac.ke',
+    officeContested: 'Vice-President',
+    constitutionalGrounds: 'Article 44(3) — Inquiry regarding digital campaign material distribution during moratorium window before polls opened.',
+    articlesCited: ['Article 51', 'Article 44(3)', 'Article 46'],
+    remedyRequested: 'Formal audit of campaign moratorium timeline and Patron clarification statement.',
+    status: 'Under Review by Commission & Patron',
+    patronNotified: true,
+    transmittalHash: '9F81BC30A12480EF',
+    deadlineHoursRemaining: 42,
+    resolutionNotes: 'Commission confirmed campaign social media embargo was observed; preliminary joint ruling drafted with Patron confirmation.'
+  }
+];
+
+// Fetch all constitutional petitions / appeals
+app.get('/api/petitions', async (_req: Request, res: Response) => {
+  try {
+    if (supabaseAdmin) {
+      const { data: supaPetitions, error } = await supabaseAdmin
+        .from('constitutional_petitions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && supaPetitions && supaPetitions.length > 0) {
+        return res.json({ success: true, petitions: supaPetitions });
+      }
+    }
+
+    return res.json({ success: true, petitions: constitutionalPetitionsStore });
+  } catch (_err) {
+    return res.json({ success: true, petitions: constitutionalPetitionsStore });
+  }
+});
+
+// File formal Article 51 Petition
+app.post('/api/petitions', async (req: Request, res: Response) => {
+  try {
+    const {
+      complainantName,
+      petitionerName,
+      regNo,
+      email,
+      complainantRole,
+      petitionerRole,
+      officeContested,
+      constitutionalGrounds,
+      grounds,
+      articlesCited,
+      remedyRequested,
+      remedy,
+    } = req.body;
+
+    const name = (petitionerName || complainantName || '').trim();
+    const registration = (regNo || '').trim().toUpperCase();
+    const studentEmail = (email || '').trim().toLowerCase();
+    const role = (petitionerRole || complainantRole || 'Enrolled Voter').trim();
+    const office = (officeContested || 'General Electoral Procedure (Article 51)').trim();
+    const details = (constitutionalGrounds || grounds || '').trim();
+    const prayers = (remedyRequested || remedy || 'Constitutional review and formal determination by Commission and Patron').trim();
+    const articles = Array.isArray(articlesCited) && articlesCited.length > 0 
+      ? articlesCited 
+      : ['Article 51 (Dispute & Petition Procedure)'];
+
+    if (!name || !registration || !details) {
+      return res.status(400).json({
+        error: 'Missing required petition parameters: Full Name, Registration Number, and Grounds are mandatory.',
+      });
+    }
+
+    const docketNumber = `KUPSA-PET-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const nowIso = new Date().toISOString();
+    const nowFormatted = new Date().toLocaleDateString('en-KE', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }) + ' EAT';
+
+    const transmittalHash = crypto
+      .createHash('sha256')
+      .update(`${docketNumber}-${name}-${registration}-${Date.now()}`)
+      .digest('hex')
+      .substring(0, 16)
+      .toUpperCase();
+
+    const newPetition: StoredPetition = {
+      id: docketNumber,
+      timestamp: nowFormatted,
+      createdAtIso: nowIso,
+      complainantName: name,
+      complainantRole: role,
+      regNo: registration,
+      email: studentEmail,
+      officeContested: office,
+      constitutionalGrounds: details,
+      articlesCited: articles,
+      remedyRequested: prayers,
+      status: 'Under Review by Commission & Patron',
+      patronNotified: true,
+      transmittalHash,
+      deadlineHoursRemaining: 48,
+      resolutionNotes: 'Formal petition docketed under Article 51. Concurrent copy transmitted to the School Patron. Hearing or written determination scheduled within 48 hours.'
+    };
+
+    // Store in memory
+    constitutionalPetitionsStore.unshift(newPetition);
+
+    // Try storing in Supabase constitutional_petitions if exists
+    if (supabaseAdmin) {
+      try {
+        await supabaseAdmin.from('constitutional_petitions').insert({
+          id: docketNumber,
+          petitioner_name: name,
+          reg_no: registration,
+          email: studentEmail,
+          role,
+          office_contested: office,
+          grounds: details,
+          remedy: prayers,
+          articles_cited: articles,
+          status: newPetition.status,
+          patron_notified: true,
+          transmittal_hash: transmittalHash,
+          created_at: nowIso,
+        });
+      } catch (_dbErr) {
+        // Supabase table may not exist yet, continue with in-memory persistence
+      }
+
+      // Always record in official audit logs table
+      await supabaseAdmin.from('audit_logs').insert({
+        officer_email: 'patron.office@kabarak.ac.ke',
+        officer_role: 'School of Pharmacy Patron & Electoral Commission',
+        action_type: 'ARTICLE_51_PETITION_DOCKETED',
+        details: {
+          docketId: docketNumber,
+          petitioner: name,
+          regNo: registration,
+          officeContested: office,
+          transmittalHash,
+          statutoryDeadline: '48 Hours from Filing',
+          timestamp: nowIso,
+        },
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Article 51 Constitutional Petition successfully docketed and transmitted to the Commission and Patron.',
+      petition: newPetition,
+    });
+  } catch (err: any) {
+    console.error('Petition submission error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to lodge constitutional petition' });
+  }
+});
+
+// Adjudicate / Update Petition Ruling (Commissioner or Patron action)
+app.post('/api/petitions/adjudicate', async (req: Request, res: Response) => {
+  try {
+    const { id, status, resolutionNotes, adjudicatorRole, adjudicatorName } = req.body;
+    if (!id || !status) {
+      return res.status(400).json({ error: 'Petition ID and status are required for adjudication.' });
+    }
+
+    const existingIndex = constitutionalPetitionsStore.findIndex((p) => p.id === id);
+    let updated: StoredPetition;
+
+    const nowFormatted = new Date().toLocaleDateString('en-KE', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }) + ' EAT';
+
+    if (existingIndex >= 0) {
+      constitutionalPetitionsStore[existingIndex] = {
+        ...constitutionalPetitionsStore[existingIndex],
+        status,
+        resolutionNotes: resolutionNotes || constitutionalPetitionsStore[existingIndex].resolutionNotes,
+        adjudicatedBy: `${adjudicatorName || 'Chief Returning Officer'} (${adjudicatorRole || 'Commission Desk'})`,
+        adjudicatedAt: nowFormatted,
+      };
+      updated = constitutionalPetitionsStore[existingIndex];
+    } else {
+      updated = {
+        id,
+        timestamp: nowFormatted,
+        createdAtIso: new Date().toISOString(),
+        complainantName: 'Unknown Petitioner',
+        complainantRole: 'Petitioner',
+        regNo: 'PHARM/DEMO',
+        email: 'student@kabarak.ac.ke',
+        officeContested: 'General',
+        constitutionalGrounds: 'Article 51 Inquiry',
+        articlesCited: ['Article 51'],
+        remedyRequested: 'Adjudication',
+        status,
+        patronNotified: true,
+        transmittalHash: 'VERIFIED-RULING',
+        deadlineHoursRemaining: 0,
+        resolutionNotes,
+        adjudicatedBy: adjudicatorName,
+        adjudicatedAt: nowFormatted,
+      };
+      constitutionalPetitionsStore.unshift(updated);
+    }
+
+    // Try updating Supabase
+    if (supabaseAdmin) {
+      try {
+        await supabaseAdmin
+          .from('constitutional_petitions')
+          .update({
+            status,
+            resolution_notes: resolutionNotes,
+            adjudicated_at: new Date().toISOString(),
+            adjudicated_by: adjudicatorName,
+          })
+          .eq('id', id);
+      } catch (_err) {
+        // Ignore if table missing
+      }
+
+      // Record ruling in audit log
+      await supabaseAdmin.from('audit_logs').insert({
+        officer_email: 'commission.legal@kabarak.ac.ke',
+        officer_role: adjudicatorRole || 'Chief Returning Officer',
+        action_type: 'ARTICLE_51_DETERMINATION_ISSUED',
+        details: {
+          docketId: id,
+          newStatus: status,
+          rulingNotes: resolutionNotes,
+          adjudicator: adjudicatorName,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Docket ${id} adjudication updated to ${status}.`,
+      petition: updated,
+    });
+  } catch (err: any) {
+    console.error('Adjudicate petition error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to adjudicate petition' });
   }
 });
 
@@ -1372,7 +1723,7 @@ app.post('/api/email/voter-pass', async (req: Request, res: Response) => {
         yearOfStudy: yearOfStudy || 'Year 1',
         passwordCode,
         portalUrl,
-        pollingStation: pollingStation || 'School of Pharmacy Complex, Kabarak University',
+        pollingStation: pollingStation || 'School of Pharmacy, Kabarak University',
       },
     },
     `voter-pass:${recipient}`

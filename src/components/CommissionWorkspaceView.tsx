@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ViewId, ReadinessGate, Candidate, StudentRecord, DisputeSubmission } from '../types';
 import {
   READINESS_GATES,
@@ -9,6 +9,7 @@ import {
   CONTINGENCY_PROTOCOLS,
   TURNOUT_METRICS
 } from '../data/election';
+import { fetchConstitutionalPetitions, adjudicateConstitutionalPetition } from '../lib/electionService';
 import { PageIntro } from './site-shell';
 import {
   Lock,
@@ -76,6 +77,15 @@ export function CommissionWorkspaceView({
   const [showRulingModal, setShowRulingModal] = useState<string | null>(null);
   const [rulingNotes, setRulingNotes] = useState('');
 
+  // Load live constitutional petitions from server
+  useEffect(() => {
+    fetchConstitutionalPetitions().then((res) => {
+      if (res && res.length > 0) {
+        setDisputesList(res);
+      }
+    });
+  }, []);
+
   const triggerSuccessBanner = (msg: string) => {
     setActionSuccessMessage(msg);
     setTimeout(() => setActionSuccessMessage(null), 3500);
@@ -134,15 +144,23 @@ export function CommissionWorkspaceView({
     triggerSuccessBanner(`Toggled eligibility status for Reg No ${regNo}.`);
   };
 
-  // Dispute resolution actions
-  const handleResolveDispute = (dispId: string, status: 'Resolved' | 'Dismissed' | 'Escalated to Patron') => {
+  // Dispute resolution & Article 51 Adjudication actions
+  const handleResolveDispute = async (
+    dispId: string,
+    status: 'Resolved' | 'Dismissed' | 'Escalated to Patron' | 'Hearing Convened' | 'Upheld'
+  ) => {
+    const timestampStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' EAT';
+    const note = rulingNotes || `Actioned by ${selectedRole} on ${timestampStr}: ${status}.`;
+
     setDisputesList((prev) =>
       prev.map((d) =>
         d.id === dispId
           ? {
               ...d,
               status,
-              resolutionNotes: rulingNotes || `Actioned by Commission on ${new Date().toLocaleTimeString()} EAT: ${status}.`
+              resolutionNotes: note,
+              adjudicatedBy: selectedRole,
+              adjudicatedAt: timestampStr,
             }
           : d
       )
@@ -150,6 +168,18 @@ export function CommissionWorkspaceView({
     setShowRulingModal(null);
     setRulingNotes('');
     triggerSuccessBanner(`Dispute ${dispId} marked as ${status}.`);
+
+    try {
+      await adjudicateConstitutionalPetition({
+        id: dispId,
+        status,
+        resolutionNotes: note,
+        adjudicatorRole: selectedRole,
+        adjudicatorName: officerId || 'Chief Returning Officer',
+      });
+    } catch (_err) {
+      // Local state is already updated
+    }
   };
 
   // Toggle Readiness Gate Checkbox
@@ -722,22 +752,35 @@ export function CommissionWorkspaceView({
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        onClick={() => handleResolveDispute(disp.id, 'Hearing Convened')}
+                        className="rounded-md bg-sky-600 text-white px-2 py-1 text-[11px] font-semibold hover:bg-sky-700 cursor-pointer"
+                        title="Convene 48-Hour Quorum Hearing"
+                      >
+                        Convene Hearing
+                      </button>
                       <button
                         onClick={() => handleResolveDispute(disp.id, 'Resolved')}
-                        className="rounded-md bg-emerald-600 text-white px-2.5 py-1 text-[11px] font-semibold hover:bg-emerald-700"
+                        className="rounded-md bg-emerald-600 text-white px-2.5 py-1 text-[11px] font-semibold hover:bg-emerald-700 cursor-pointer"
                       >
                         Resolve
                       </button>
                       <button
+                        onClick={() => handleResolveDispute(disp.id, 'Upheld')}
+                        className="rounded-md bg-indigo-600 text-white px-2.5 py-1 text-[11px] font-semibold hover:bg-indigo-700 cursor-pointer"
+                      >
+                        Uphold
+                      </button>
+                      <button
                         onClick={() => handleResolveDispute(disp.id, 'Dismissed')}
-                        className="rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-foreground hover:bg-muted"
+                        className="rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-foreground hover:bg-muted cursor-pointer"
                       >
                         Dismiss
                       </button>
                       <button
                         onClick={() => handleResolveDispute(disp.id, 'Escalated to Patron')}
-                        className="rounded-md bg-amber-600 text-white px-2.5 py-1 text-[11px] font-semibold hover:bg-amber-700"
+                        className="rounded-md bg-amber-600 text-white px-2.5 py-1 text-[11px] font-semibold hover:bg-amber-700 cursor-pointer"
                       >
                         Escalate
                       </button>
@@ -746,10 +789,30 @@ export function CommissionWorkspaceView({
 
                   <p className="text-sm font-semibold text-foreground">
                     Contested: {disp.officeContested} · Complainant: {disp.complainantName} ({disp.complainantRole})
+                    {disp.regNo && <span className="font-mono text-xs text-muted-foreground ml-2">[{disp.regNo}]</span>}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {disp.constitutionalGrounds}
                   </p>
+
+                  <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-muted-foreground pt-1">
+                    {disp.transmittalHash && (
+                      <span className="rounded bg-secondary px-2 py-0.5 text-emerald-700 dark:text-emerald-400 font-bold">
+                        Patron Hash: {disp.transmittalHash}
+                      </span>
+                    )}
+                    {disp.articlesCited && disp.articlesCited.map((a, i) => (
+                      <span key={i} className="rounded bg-muted px-1.5 py-0.5">
+                        {a}
+                      </span>
+                    ))}
+                    {disp.adjudicatedBy && (
+                      <span className="text-primary font-sans font-semibold">
+                        · Adjudicated by {disp.adjudicatedBy}
+                      </span>
+                    )}
+                  </div>
+
                   {disp.resolutionNotes && (
                     <div className="rounded-lg bg-secondary/50 p-2 text-xs font-mono text-foreground border border-border/50">
                       <strong>Ruling Note:</strong> {disp.resolutionNotes}

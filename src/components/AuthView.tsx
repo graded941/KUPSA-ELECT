@@ -114,16 +114,15 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
     // Autonomous passcard dispatch via SMTP server (verve.n.co.ke@gmail.com)
     if (res.password) {
       const generatedPassword = res.password;
-      setGmailDeliveryStatus('sending');
-      const randomReg = `PHARM/2026/${Math.floor(1000 + Math.random() * 9000)}`;
+      const studentRegNo = res.user?.regNo || (res as any).regNo || `PHARM/2023/${Math.floor(100 + Math.random() * 900).toString().padStart(4, '0')}`;
 
       dispatchVoterPassEmail({
         studentName: fullName.trim(),
-        regNo: randomReg,
+        regNo: studentRegNo,
         yearOfStudy,
         email: cleanEmail,
         passwordCode: generatedPassword,
-        pollingStation: 'School of Pharmacy Complex, Kabarak University',
+        pollingStation: 'School of Pharmacy, Kabarak University',
       })
         .then((result) => {
           if (result.success) {

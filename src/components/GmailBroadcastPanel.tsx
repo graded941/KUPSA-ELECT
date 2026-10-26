@@ -82,7 +82,7 @@ export function GmailBroadcastPanel() {
   // Commission Notice state
   const [noticeHeadline, setNoticeHeadline] = useState('Official Polling Station Check-in Directives');
   const [noticeBody, setNoticeBody] = useState(
-    'All accredited pharmacy scholars are notified that official physical polling desks open at 08:00 EAT at the School of Pharmacy Complex. Online e-balloting remains accessible 24/7 on this portal.'
+    'All accredited pharmacy scholars are notified that official online voting opens at 08:00 EAT for the School of Pharmacy, Kabarak University. Online e-balloting remains accessible 24/7 on this portal.'
   );
   const [noticeUrgency, setNoticeUrgency] = useState<'routine' | 'urgent' | 'critical'>('urgent');
   const [noticeRecipient, setNoticeRecipient] = useState('');
@@ -268,12 +268,12 @@ export function GmailBroadcastPanel() {
         regNo: passcardRegNo.trim(),
         yearOfStudy: passcardYear,
         passwordCode: passcardPassword.trim(),
-        pollingStation: 'School of Pharmacy Complex, Kabarak University',
+        pollingStation: 'School of Pharmacy, Kabarak University',
       });
 
       if (res.success) {
         setPasscardStatus(
-          `✓ Official Voter Pass (with PDF passcard, QR code, and .ics calendar invite) successfully queued & sent to ${passcardEmail} (Outbox ID: ${res.outboxId})`
+          `✓ Official Voter Pass (with PDF passcard and .ics calendar invite) successfully queued & sent to ${passcardEmail} (Outbox ID: ${res.outboxId})`
         );
       } else {
         setPasscardStatus(`✗ Error: ${res.error}`);

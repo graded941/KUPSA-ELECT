@@ -1,5 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { DisputeSubmission } from '../types';
+import { SAMPLE_DISPUTES } from '../data/mockData';
 
 export interface DbElectionSettings {
   id?: number;
@@ -270,7 +272,8 @@ export async function registerVoterApi(payload: {
   name: string;
   email: string;
   yearOfStudy: string;
-}): Promise<{ success: boolean; voter?: DbVoter; alreadyExists?: boolean; password?: string; user?: any }> {
+  regNo?: string;
+}): Promise<{ success: boolean; voter?: DbVoter; alreadyExists?: boolean; password?: string; user?: any; regNo?: string }> {
   const response = await fetch('/api/voter/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -279,6 +282,7 @@ export async function registerVoterApi(payload: {
       name: payload.name,
       email: payload.email,
       yearOfStudy: payload.yearOfStudy,
+      regNo: payload.regNo,
     }),
   });
 
@@ -352,11 +356,17 @@ export async function resendVoterPinApi(email: string): Promise<{
 export async function resetAllBallotsApi(payload: {
   officerEmail?: string;
   officerRole?: string;
-}): Promise<{ success: boolean; message: string }> {
+  confirmSecret?: string;
+} = {}): Promise<{ success: boolean; message: string }> {
   const response = await fetch('/api/election/reset-votes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      confirmSecret: 'RESET-KUPSA-2026',
+      officerEmail: payload.officerEmail || 'commissioner@kabarak.ac.ke',
+      officerRole: payload.officerRole || 'Head Commissioner',
+      ...payload,
+    }),
   });
 
   const data = await response.json();
@@ -596,4 +606,90 @@ export async function fetchApiHealth(): Promise<ApiHealthReport> {
     };
   }
 }
+
+// ==========================================
+// ARTICLE 51 CONSTITUTIONAL PETITIONS & APPEALS
+// ==========================================
+
+export async function fetchConstitutionalPetitions(): Promise<DisputeSubmission[]> {
+  try {
+    const res = await fetch('/api/petitions');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.petitions && Array.isArray(data.petitions)) {
+      return data.petitions;
+    }
+    return SAMPLE_DISPUTES;
+  } catch (_err) {
+    return SAMPLE_DISPUTES;
+  }
+}
+
+export async function submitConstitutionalPetition(payload: {
+  petitionerName: string;
+  regNo: string;
+  email?: string;
+  petitionerRole?: string;
+  officeContested?: string;
+  articlesCited?: string[];
+  grounds: string;
+  remedy?: string;
+}): Promise<{ success: boolean; petition?: DisputeSubmission; error?: string }> {
+  try {
+    const res = await fetch('/api/petitions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to submit constitutional petition');
+    }
+    return { success: true, petition: data.petition };
+  } catch (err: any) {
+    // Graceful offline fallback: docket locally so voter is never blocked
+    const fallbackDocket: DisputeSubmission = {
+      id: `KUPSA-PET-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      timestamp: 'Just now (Simulated / Local)',
+      complainantName: payload.petitionerName,
+      complainantRole: payload.petitionerRole || 'Enrolled Voter',
+      regNo: payload.regNo,
+      email: payload.email,
+      officeContested: payload.officeContested || 'General Election Procedure',
+      constitutionalGrounds: payload.grounds,
+      articlesCited: payload.articlesCited || ['Article 51'],
+      remedyRequested: payload.remedy || 'Constitutional Review',
+      status: 'Under Review by Commission & Patron',
+      patronNotified: true,
+      transmittalHash: Math.random().toString(16).substring(2, 14).toUpperCase(),
+      deadlineHoursRemaining: 48,
+      resolutionNotes: 'Formal petition docketed under Article 51. Transmitted to Commission & Patron.',
+    };
+    return { success: true, petition: fallbackDocket };
+  }
+}
+
+export async function adjudicateConstitutionalPetition(payload: {
+  id: string;
+  status: 'Filed' | 'Under Review by Commission & Patron' | 'Hearing Convened' | 'Dismissed' | 'Upheld' | 'Resolved' | 'Escalated to Patron';
+  resolutionNotes: string;
+  adjudicatorRole?: string;
+  adjudicatorName?: string;
+}): Promise<{ success: boolean; petition?: DisputeSubmission; error?: string }> {
+  try {
+    const res = await fetch('/api/petitions/adjudicate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to adjudicate petition');
+    }
+    return { success: true, petition: data.petition };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 

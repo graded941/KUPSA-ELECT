@@ -112,12 +112,22 @@ export interface DisputeSubmission {
   status:
     | 'Filed'
     | 'Under Review by Commission & Patron'
+    | 'Hearing Convened'
     | 'Dismissed'
     | 'Upheld'
     | 'Resolved'
     | 'Escalated to Patron';
   patronNotified: boolean;
   resolutionNotes?: string;
+  // Article 51 Constitutional Fields
+  regNo?: string;
+  email?: string;
+  articlesCited?: string[];
+  remedyRequested?: string;
+  transmittalHash?: string;
+  deadlineHoursRemaining?: number;
+  adjudicatedBy?: string;
+  adjudicatedAt?: string;
 }
 
 export interface CandidateTally {
