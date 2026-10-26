@@ -96,13 +96,27 @@ app.use((req, res, next) => {
   next();
 });
 
-// Initialize Supabase admin client
-const rawSupabaseUrl = (process.env.VITE_SUPABASE_URL || '').trim();
+
+// Initialize Supabase admin client (supports both Vercel SUPABASE_* and Vite VITE_SUPABASE_* aliases)
+const rawSupabaseUrl = (
+  process.env.VITE_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  ''
+).trim();
 const supabaseUrl = rawSupabaseUrl
   .replace(/\/rest\/v1\/?$/i, '')
   .replace(/\/+$/, '');
-const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-const anonKey = (process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+const serviceRoleKey = (
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_KEY ||
+  ''
+).trim();
+const anonKey = (
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_KEY ||
+  ''
+).trim();
 
 export const supabaseAdmin: SupabaseClient | null =
   supabaseUrl && (serviceRoleKey || anonKey)
@@ -375,7 +389,7 @@ let inMemoryAuditLogs: any[] = [];
 // SYSTEM HEALTH & DIAGNOSTICS ENDPOINTS
 // ==========================================
 
-app.get(['/api/health', '/api/ping'], async (_req: Request, res: Response) => {
+app.get(['/api', '/api/health', '/api/ping'], async (_req: Request, res: Response) => {
   const startTime = Date.now();
   let dbStatus = 'disconnected';
   let dbError: string | null = null;
@@ -586,112 +600,6 @@ async function ensureVoterRecord(
     inMemoryVoters.push(finalVoter);
   }
 
-  voterPinStore.set(cleanEmail, {
-    pin: generatedPassword,
-    regNo: finalVoter.reg_no,
-    name: finalVoter.full_name,
-    yearOfStudy: finalVoter.year_of_study,
-  });
-
-  return {
-    ...finalVoter,
-    generatedPassword,
-  };
-}
-  fullName?: string,
-  yearOfStudy?: string,
-  initialPassword?: string
-): Promise<any> {
-  if (!supabaseAdmin) return null;
-  const cleanEmail = email.trim().toLowerCase();
-
-  // 1. Check existing voter record in public.voters
-  const { data: existing } = await supabaseAdmin
-    .from('voters')
-    .select('*')
-    .ilike('email', cleanEmail)
-    .maybeSingle();
-
-  if (existing) {
-    const cached = voterPinStore.get(cleanEmail);
-    return {
-      ...existing,
-      generatedPassword: cached?.pin || initialPassword,
-    };
-  }
-
-  if (!cleanEmail.endsWith('@kabarak.ac.ke')) return null;
-
-  // 2. Obtain an auth.users ID to satisfy the foreign key constraint voters_id_fkey
-  let authUserId: string | null = null;
-  // Cryptographic 6-Digit PIN generated from OS entropy
-  const randomPin = crypto.randomInt(100000, 1000000);
-  const generatedPassword = initialPassword || `KUP-${randomPin}`;
-  const regSuffix = Math.floor(1000 + Math.random() * 9000);
-  const regNo = `PHARM/2026/${regSuffix}`;
-  const studentName = (fullName || cleanEmail.split('@')[0].replace(/[._-]/g, ' ')).replace(/\b\w/g, (c) => c.toUpperCase());
-
-  try {
-    const { data: authUser } = await supabaseAdmin.auth.admin.createUser({
-      email: cleanEmail,
-      password: generatedPassword,
-      email_confirm: true,
-      user_metadata: {
-        full_name: studentName,
-        year_of_study: yearOfStudy || 'Year 3',
-        reg_no: regNo,
-        pin: generatedPassword,
-      },
-    });
-    if (authUser?.user?.id) {
-      authUserId = authUser.user.id;
-    }
-  } catch (_e) {
-    // If user already exists in auth.users, fetch from user list
-  }
-
-  if (!authUserId) {
-    try {
-      const { data: list } = await supabaseAdmin.auth.admin.listUsers();
-      const matched = list?.users?.find((u) => u.email?.toLowerCase() === cleanEmail);
-      if (matched) authUserId = matched.id;
-    } catch (e) {
-      console.error('Error finding auth user by email:', e);
-    }
-  }
-
-  if (!authUserId) return null;
-
-  // 3. Upsert into public.voters
-  const { data: insertedVoter, error: insErr } = await supabaseAdmin
-    .from('voters')
-    .upsert({
-      id: authUserId,
-      reg_no: regNo,
-      email: cleanEmail,
-      full_name: studentName,
-      year_of_study: yearOfStudy || 'Year 3',
-      accreditation_status: 'Eligible',
-      has_voted: false,
-    }, { onConflict: 'id' })
-    .select()
-    .maybeSingle();
-
-  if (insErr) {
-    console.error('Failed to create voter in public.voters:', insErr);
-  }
-
-  const finalVoter = insertedVoter || {
-    id: authUserId,
-    reg_no: regNo,
-    email: cleanEmail,
-    full_name: studentName,
-    year_of_study: yearOfStudy || 'Year 3',
-    accreditation_status: 'Eligible',
-    has_voted: false,
-  };
-
-  // Cache in voterPinStore for unified server authority
   voterPinStore.set(cleanEmail, {
     pin: generatedPassword,
     regNo: finalVoter.reg_no,
