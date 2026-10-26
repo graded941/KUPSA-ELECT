@@ -449,7 +449,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                         required
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        placeholder="e.g. Cynthia Moraa"
+                        placeholder="e.g. Jane Doe"
                         className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                       />
                     </div>
@@ -471,7 +471,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                           setSignupEmail(e.target.value);
                           if (signupError) setSignupError(null);
                         }}
-                        placeholder="e.g. cmoraa23@kabarak.ac.ke"
+                        placeholder="e.g. student@kabarak.ac.ke"
                         className={`w-full rounded-xl border py-2.5 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-all ${
                           emailError
                             ? 'border-destructive bg-destructive/5 focus:border-destructive'
@@ -565,7 +565,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                           setLoginEmail(e.target.value);
                           if (loginError) setLoginError(null);
                         }}
-                        placeholder="e.g. john.doe@kabarak.ac.ke"
+                        placeholder="e.g. student@kabarak.ac.ke"
                         className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                       />
                     </div>
@@ -623,38 +623,6 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                     <ArrowRight className="h-4 w-4" />
                   </button>
 
-                  {/* Demo Account Helper */}
-                  <div className="pt-3 border-t border-border">
-                    <p className="text-[11px] font-mono text-muted-foreground mb-2 text-center">
-                      Accredited Demonstration Accounts:
-                    </p>
-                    <div className="flex flex-col gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLoginEmail('john.doe@kabarak.ac.ke');
-                          setLoginPassword('KUP-2026');
-                          setLoginError(null);
-                        }}
-                        className="text-left text-xs p-2 rounded-lg bg-secondary/60 hover:bg-accent/40 border border-border flex items-center justify-between"
-                      >
-                        <span className="font-mono text-foreground font-medium">john.doe@kabarak.ac.ke</span>
-                        <span className="text-[10px] font-mono text-primary font-semibold bg-card px-1.5 py-0.5 rounded">Eligible (Not Voted)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLoginEmail('sarah.cherono@kabarak.ac.ke');
-                          setLoginPassword('KUP-2026');
-                          setLoginError(null);
-                        }}
-                        className="text-left text-xs p-2 rounded-lg bg-secondary/60 hover:bg-accent/40 border border-border flex items-center justify-between"
-                      >
-                        <span className="font-mono text-foreground font-medium">sarah.cherono@kabarak.ac.ke</span>
-                        <span className="text-[10px] font-mono text-muted-foreground bg-card px-1.5 py-0.5 rounded">Already Voted State</span>
-                      </button>
-                    </div>
-                  </div>
                 </form>
               )}
             </div>
