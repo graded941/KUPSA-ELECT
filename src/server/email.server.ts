@@ -1,4 +1,5 @@
-import nodemailer, { Transporter } from 'nodemailer';
+import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 import dotenv from 'dotenv';

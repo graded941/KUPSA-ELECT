@@ -96,12 +96,25 @@ app.use((req, res, next) => {
   next();
 });
 
+// Restore rewritten /api/* path on Vercel serverless without affecting root / SPA requests
+app.use((req, _res, next) => {
+  const matchedPath = (req.headers['x-matched-path'] as string) || (req.headers['x-vercel-matched-path'] as string);
+  if (matchedPath && matchedPath.startsWith('/api')) {
+    req.url = matchedPath;
+  }
+  next();
+});
+
+// Authoritative Supabase credentials with robust production fallbacks for Vercel
+const DEFAULT_SUPABASE_URL = 'https://fhpybihsdyyjskvwkazz.supabase.co';
+const DEFAULT_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZocHliaWhzZHl5anNrdndrYXp6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjQ0MjI1NiwiZXhwIjoyMTA4MDE4MjU2fQ.eAA2zwx5lFZn5NMY6AV5G_9SixtdUA2xtCWRbtgvpaQ';
+const DEFAULT_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZocHliaWhzZHl5anNrdndrYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0NDIyNTYsImV4cCI6MjEwODAxODI1Nn0.CEVcuHPwCCvbGsc2E0WMUWi8UCxFGHCtk7fUPuWQW2M';
 
 // Initialize Supabase admin client (supports both Vercel SUPABASE_* and Vite VITE_SUPABASE_* aliases)
 const rawSupabaseUrl = (
   process.env.VITE_SUPABASE_URL ||
   process.env.SUPABASE_URL ||
-  ''
+  DEFAULT_SUPABASE_URL
 ).trim();
 const supabaseUrl = rawSupabaseUrl
   .replace(/\/rest\/v1\/?$/i, '')
@@ -109,13 +122,13 @@ const supabaseUrl = rawSupabaseUrl
 const serviceRoleKey = (
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.SUPABASE_SERVICE_KEY ||
-  ''
+  DEFAULT_SERVICE_ROLE_KEY
 ).trim();
 const anonKey = (
   process.env.VITE_SUPABASE_ANON_KEY ||
   process.env.SUPABASE_ANON_KEY ||
   process.env.SUPABASE_KEY ||
-  ''
+  DEFAULT_ANON_KEY
 ).trim();
 
 export const supabaseAdmin: SupabaseClient | null =

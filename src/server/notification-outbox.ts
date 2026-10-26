@@ -4,11 +4,13 @@ import {
   sendVoterPassEmail,
   sendElectionResultsEmail,
   sendCommissionNoticeEmail,
+  resolveSmtpCredentials,
+} from './email.server.js';
+import type {
   VoterPassPayload,
   ElectionResultsPayload,
   CommissionNoticePayload,
-  resolveSmtpCredentials,
-} from './email.server';
+} from './email.server.js';
 
 export interface OutboxMessage {
   id: string;
