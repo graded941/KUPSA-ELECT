@@ -5,10 +5,10 @@ import {
   OBSERVER_AUDIT_LOGS,
   SAMPLE_DISPUTES,
   CANDIDATES,
-  SAMPLE_STUDENTS,
   CONTINGENCY_PROTOCOLS,
   TURNOUT_METRICS
 } from '../data/election';
+import { useVotingStore } from '../context/VotingStore';
 import { fetchConstitutionalPetitions, adjudicateConstitutionalPetition } from '../lib/electionService';
 import { PageIntro } from './site-shell';
 import {
@@ -63,15 +63,38 @@ export function CommissionWorkspaceView({
   const [selectedRole, setSelectedRole] = useState(OFFICER_ROLES[0]);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Operational State
+  // Operational State & Live Voting Store
+  const {
+    accreditationList,
+    totalRegistered,
+    votes,
+    toggleAccreditation
+  } = useVotingStore();
+
+  const totalVotesCast = votes.length;
+  const turnoutPercent = totalRegistered > 0 ? Math.round((totalVotesCast / totalRegistered) * 100) : 0;
+
   const [activeTab, setActiveTab] = useState<'vetting' | 'voters' | 'disputes' | 'readiness'>('vetting');
   const [systemHalt, setSystemHalt] = useState(false);
   const [candidatesList, setCandidatesList] = useState<Candidate[]>(CANDIDATES);
-  const [studentsList, setStudentsList] = useState<StudentRecord[]>(SAMPLE_STUDENTS);
   const [disputesList, setDisputesList] = useState<DisputeSubmission[]>(SAMPLE_DISPUTES);
   const [gatesList, setGatesList] = useState<ReadinessGate[]>(READINESS_GATES);
   const [voterSearchQuery, setVoterSearchQuery] = useState('');
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
+
+  // Derive students list directly from official live accreditation list
+  const studentsList: StudentRecord[] = accreditationList.map((a) => ({
+    regNo: a.regNo,
+    name: a.name,
+    email: a.email,
+    yearOfStudy: a.yearOfStudy,
+    status: a.status,
+    reason: a.reason || (a.status === 'Eligible'
+      ? 'Verified pharmacy student on official certified roster.'
+      : 'Accreditation flagged pending verification.'),
+    duesCleared: a.status === 'Eligible',
+    academicGoodStanding: true,
+  }));
 
   // New dispute modal state
   const [showRulingModal, setShowRulingModal] = useState<string | null>(null);
@@ -127,20 +150,9 @@ export function CommissionWorkspaceView({
     triggerSuccessBanner(`Updated clearance status to "${newStatus}" for candidate ${candId}.`);
   };
 
-  // 1-Click Voter Override
+  // 1-Click Voter Override synced with official accreditation registry
   const handleVoterOverride = (regNo: string) => {
-    setStudentsList((prev) =>
-      prev.map((s) => {
-        if (s.regNo !== regNo) return s;
-        const newStatus = s.status === 'Eligible' ? 'Action Required' : 'Eligible';
-        return {
-          ...s,
-          status: newStatus,
-          duesCleared: newStatus === 'Eligible',
-          reason: newStatus === 'Eligible' ? 'Manually accredited by Commission Desk (Article 39 exception)' : s.reason
-        };
-      })
-    );
+    toggleAccreditation(regNo);
     triggerSuccessBanner(`Toggled eligibility status for Reg No ${regNo}.`);
   };
 
@@ -452,12 +464,12 @@ export function CommissionWorkspaceView({
           <div className="rounded-2xl border border-border bg-card p-4 shadow-xs">
             <span className="eyebrow text-primary text-[10px]">Accredited Ballots</span>
             <p className="font-mono text-2xl font-bold text-foreground mt-1">
-              {TURNOUT_METRICS.ballotsCast} <span className="text-xs font-normal text-muted-foreground">/ {TURNOUT_METRICS.registeredTotal}</span>
+              {totalVotesCast} <span className="text-xs font-normal text-muted-foreground">/ {totalRegistered}</span>
             </p>
             <div className="mt-2 h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-              <div className="h-full bg-primary" style={{ width: `${TURNOUT_METRICS.turnoutPercentage}%` }} />
+              <div className="h-full bg-primary" style={{ width: `${turnoutPercent}%` }} />
             </div>
-            <p className="text-[11px] text-muted-foreground mt-1 font-mono">{TURNOUT_METRICS.turnoutPercentage}% Turnout</p>
+            <p className="text-[11px] text-muted-foreground mt-1 font-mono">{turnoutPercent}% Turnout</p>
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-4 shadow-xs">
@@ -643,49 +655,59 @@ export function CommissionWorkspaceView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredStudents.map((stud) => (
-                    <tr key={stud.regNo} className="hover:bg-muted/20 transition-colors">
-                      <td className="py-3 px-3 font-mono font-bold text-foreground">
-                        {stud.regNo}
-                      </td>
-                      <td className="py-3 px-3 text-foreground font-medium">
-                        {stud.name}
-                      </td>
-                      <td className="py-3 px-3 text-muted-foreground">
-                        {stud.yearOfStudy}
-                      </td>
-                      <td className="py-3 px-3 font-mono">
-                        {stud.duesCleared ? (
-                          <span className="text-success font-semibold">Cleared</span>
-                        ) : (
-                          <span className="text-destructive font-semibold">Arrears</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-bold ${
-                            stud.status === 'Eligible'
-                              ? 'bg-success/15 text-success'
-                              : 'bg-destructive/15 text-destructive'
-                          }`}
-                        >
-                          {stud.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <button
-                          onClick={() => handleVoterOverride(stud.regNo)}
-                          className={`rounded-lg px-3 py-1 text-[11px] font-semibold transition-colors ${
-                            stud.status === 'Eligible'
-                              ? 'border border-destructive/30 text-destructive hover:bg-destructive/10'
-                              : 'bg-ink text-ink-foreground hover:bg-primary'
-                          }`}
-                        >
-                          {stud.status === 'Eligible' ? 'Revoke Check-In' : 'Grant Override'}
-                        </button>
+                  {filteredStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-muted-foreground font-mono">
+                        {voterSearchQuery
+                          ? 'No matching students found for search query.'
+                          : 'No registered voters in official live roll yet. Students will appear automatically upon their first login.'}
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredStudents.map((stud) => (
+                      <tr key={stud.regNo} className="hover:bg-muted/20 transition-colors">
+                        <td className="py-3 px-3 font-mono font-bold text-foreground">
+                          {stud.regNo}
+                        </td>
+                        <td className="py-3 px-3 text-foreground font-medium">
+                          {stud.name}
+                        </td>
+                        <td className="py-3 px-3 text-muted-foreground">
+                          {stud.yearOfStudy}
+                        </td>
+                        <td className="py-3 px-3 font-mono">
+                          {stud.duesCleared ? (
+                            <span className="text-success font-semibold">Cleared</span>
+                          ) : (
+                            <span className="text-destructive font-semibold">Arrears</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-bold ${
+                              stud.status === 'Eligible'
+                                ? 'bg-success/15 text-success'
+                                : 'bg-destructive/15 text-destructive'
+                            }`}
+                          >
+                            {stud.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <button
+                            onClick={() => handleVoterOverride(stud.regNo)}
+                            className={`rounded-lg px-3 py-1 text-[11px] font-semibold transition-colors ${
+                              stud.status === 'Eligible'
+                                ? 'border border-destructive/30 text-destructive hover:bg-destructive/10'
+                                : 'bg-ink text-ink-foreground hover:bg-primary'
+                            }`}
+                          >
+                            {stud.status === 'Eligible' ? 'Revoke Check-In' : 'Grant Override'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

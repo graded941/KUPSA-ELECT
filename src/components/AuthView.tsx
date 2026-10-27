@@ -17,7 +17,8 @@ import {
   RefreshCw,
   Sparkles,
   Inbox,
-  ExternalLink
+  ExternalLink,
+  IdCard
 } from 'lucide-react';
 import { dispatchVoterPassEmail } from '../lib/electionService';
 
@@ -36,13 +37,16 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
   // Sign up state
   const [fullName, setFullName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
+  const [regNo, setRegNo] = useState('');
   const [yearOfStudy, setYearOfStudy] = useState('Year 3');
   const [emailTouched, setEmailTouched] = useState(false);
+  const [regNoTouched, setRegNoTouched] = useState(false);
   const [signupError, setSignupError] = useState<string | null>(null);
 
   // Inbox confirmation state
   const [showInboxConfirm, setShowInboxConfirm] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
+  const [registeredRegNo, setRegisteredRegNo] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
 
   // Log in state
@@ -75,29 +79,53 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
     return email.trim().toLowerCase().endsWith('@kabarak.ac.ke');
   };
 
+  // Registration Number format validator: PHAM/M/0000/00/00 | PHAM/MK/0000/00/00 | PHAM/MG/0000/00/00
+  const KUPSA_REG_NO_REGEX = /^PHAM\/(M|MK|MG)\/\d{4}\/\d{2}\/\d{2}$/i;
+
+  const isRegNoValid = (reg: string) => {
+    return KUPSA_REG_NO_REGEX.test(reg.trim());
+  };
+
   const emailError =
     emailTouched && signupEmail.trim().length > 0 && !isEmailValidKabarak(signupEmail)
       ? 'Use your Kabarak student email ending in @kabarak.ac.ke'
+      : null;
+
+  const regNoError =
+    regNoTouched && regNo.trim().length > 0 && !isRegNoValid(regNo)
+      ? 'Format must be either PHAM/M/0000/00/00, PHAM/MK/0000/00/00, or PHAM/MG/0000/00/00'
       : null;
 
   // Handle Sign Up
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailTouched(true);
+    setRegNoTouched(true);
     setSignupError(null);
-
-    if (!isEmailValidKabarak(signupEmail)) {
-      setSignupError('Use your Kabarak student email ending in @kabarak.ac.ke');
-      return;
-    }
 
     if (!fullName.trim()) {
       setSignupError('Please provide your full legal student name');
       return;
     }
 
+    if (!regNo.trim()) {
+      setSignupError('Please enter your official student registration number (e.g. PHAM/M/0000/00/00)');
+      return;
+    }
+
+    if (!isRegNoValid(regNo)) {
+      setSignupError('Registration number must match format: either PHAM/M/0000/00/00, PHAM/MK/0000/00/00, or PHAM/MG/0000/00/00');
+      return;
+    }
+
+    if (!isEmailValidKabarak(signupEmail)) {
+      setSignupError('Use your Kabarak student email ending in @kabarak.ac.ke');
+      return;
+    }
+
     setIsSubmitting(true);
-    const res = await signUp(fullName, signupEmail, yearOfStudy);
+    const cleanRegNo = regNo.trim().toUpperCase();
+    const res = await signUp(fullName, signupEmail, yearOfStudy, cleanRegNo);
     setIsSubmitting(false);
 
     if (!res.success) {
@@ -107,14 +135,15 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
 
     // Successfully created account
     const cleanEmail = signupEmail.trim().toLowerCase();
+    const studentRegNo = res.user?.regNo || cleanRegNo;
     setRegisteredEmail(cleanEmail);
+    setRegisteredRegNo(studentRegNo);
     setShowInboxConfirm(true);
     setResendCooldown(60);
 
     // Autonomous passcard dispatch via SMTP server (verve.n.co.ke@gmail.com)
     if (res.password) {
       const generatedPassword = res.password;
-      const studentRegNo = res.user?.regNo || (res as any).regNo || `PHARM/2023/${Math.floor(100 + Math.random() * 900).toString().padStart(4, '0')}`;
 
       dispatchVoterPassEmail({
         studentName: fullName.trim(),
@@ -271,7 +300,8 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                   </div>
                   <p className="text-xs text-emerald-800 dark:text-emerald-200 leading-relaxed">
                     Your single-token voter password, PDF passcard, and polling calendar reminder have been sent to{' '}
-                    <strong className="font-mono underline">{registeredEmail}</strong>.
+                    <strong className="font-mono underline">{registeredEmail}</strong> for accredited student{' '}
+                    <strong className="font-mono bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-950 dark:text-emerald-100">{registeredRegNo}</strong>.
                   </p>
                   {gmailMsgId && (
                     <div className="pt-1 flex items-center justify-between text-[10px] font-mono text-emerald-700/80 border-t border-emerald-500/20">
@@ -287,7 +317,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                     <span>Dispatching credentials to your inbox...</span>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Connecting to institutional mail server (<span className="font-mono">verve.n.co.ke@gmail.com</span>) to transmit your sealed voter passcard.
+                    Connecting to institutional mail server (<span className="font-mono">verve.n.co.ke@gmail.com</span>) to transmit your sealed voter passcard for <span className="font-mono font-bold">{registeredRegNo}</span>.
                   </p>
                 </div>
               ) : (
@@ -297,7 +327,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                     <span>Sealed Password Delivery</span>
                   </div>
                   <p className="text-[11px] leading-relaxed">
-                    Under constitutional Article 39 rules, voter credentials are exclusively transmitted to your registered student address (<span className="font-mono font-medium text-foreground">{registeredEmail}</span>).
+                    Under constitutional Article 39 rules, voter credentials are exclusively transmitted to your registered student address (<span className="font-mono font-medium text-foreground">{registeredEmail}</span>) for accredited registration number <span className="font-mono font-semibold text-foreground">{registeredRegNo}</span>.
                   </p>
                 </div>
               )}
@@ -455,6 +485,40 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                     </div>
                   </div>
 
+                  {/* Student Registration Number */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-foreground">
+                        Student Registration Number
+                      </label>
+                      <span className="text-[10px] font-mono text-muted-foreground">Format: PHAM/M/0000/00/00</span>
+                    </div>
+                    <div className="relative">
+                      <IdCard className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        required
+                        value={regNo}
+                        onBlur={() => setRegNoTouched(true)}
+                        onChange={(e) => {
+                          setRegNo(e.target.value.toUpperCase());
+                          if (signupError) setSignupError(null);
+                        }}
+                        placeholder="e.g. PHAM/M/0000/00/00"
+                        className={`w-full rounded-xl border py-2.5 pl-10 pr-3 text-sm font-mono uppercase text-foreground placeholder:text-muted-foreground outline-none transition-all ${
+                          regNoError
+                            ? 'border-destructive bg-destructive/5 focus:border-destructive'
+                            : 'border-border bg-background focus:border-primary focus:ring-2 focus:ring-primary/20'
+                        }`}
+                      />
+                    </div>
+                    {regNoError && (
+                      <p role="alert" aria-live="polite" className="mt-1 text-xs font-medium text-destructive">
+                        {regNoError}
+                      </p>
+                    )}
+                  </div>
+
                   {/* Kabarak Email */}
                   <div>
                     <label className="block text-xs font-semibold text-foreground mb-1">
@@ -503,6 +567,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                         <option value="Year 3">Year 3 (Junior)</option>
                         <option value="Year 4">Year 4 (Senior)</option>
                         <option value="Year 5">Year 5 (Clinical Intern)</option>
+                        <option value="Masters">Masters (Postgraduate)</option>
                       </select>
                     </div>
                   </div>
@@ -597,8 +662,8 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                           setLoginPassword(e.target.value);
                           if (loginError) setLoginError(null);
                         }}
-                        placeholder="Enter password"
-                        className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                        placeholder="e.g. KUP-892415"
+                        className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-10 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                       />
                       <button
                         type="button"

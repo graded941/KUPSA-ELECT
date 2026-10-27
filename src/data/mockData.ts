@@ -532,68 +532,7 @@ export const CANDIDATES: Candidate[] = [
   }
 ];
 
-export const SAMPLE_STUDENTS: StudentRecord[] = [
-  {
-    regNo: 'PHARM/2023/1042',
-    name: 'Wairimu Njeri',
-    email: 'wnjeri23@kabarak.ac.ke',
-    yearOfStudy: 'Year 3',
-    status: 'Eligible',
-    reason: 'Enrolled in B.Pharm, active semester registration confirmed, KUPSA annual dues cleared.',
-    duesCleared: true,
-    academicGoodStanding: true
-  },
-  {
-    regNo: 'PHARM/2022/0891',
-    name: 'Emmanuel Kiprono',
-    email: 'ekiprono22@kabarak.ac.ke',
-    yearOfStudy: 'Year 4',
-    status: 'Eligible',
-    reason: 'Enrolled in B.Pharm, verified on official faculty register, KUPSA annual dues cleared.',
-    duesCleared: true,
-    academicGoodStanding: true
-  },
-  {
-    regNo: 'PHARM/2024/1512',
-    name: 'Stacy Akinyi',
-    email: 'sakinyi24@kabarak.ac.ke',
-    yearOfStudy: 'Year 2',
-    status: 'Eligible',
-    reason: 'Enrolled in B.Pharm, valid institutional identity, eligible for representative balloting.',
-    duesCleared: true,
-    academicGoodStanding: true
-  },
-  {
-    regNo: 'PHARM/2021/0411',
-    name: 'Collins Cheruiyot',
-    email: 'ccheruiyot21@kabarak.ac.ke',
-    yearOfStudy: 'Year 5',
-    status: 'Action Required',
-    reason: 'Semester unit registration pending registrar verification. Visit School of Pharmacy office.',
-    duesCleared: true,
-    academicGoodStanding: false
-  },
-  {
-    regNo: 'PHARM/2025/2004',
-    name: 'Joyce Kwamboka',
-    email: 'jkwamboka25@kabarak.ac.ke',
-    yearOfStudy: 'Year 1',
-    status: 'Eligible',
-    reason: 'Enrolled in B.Pharm, verified on freshman register, dues cleared.',
-    duesCleared: true,
-    academicGoodStanding: true
-  },
-  {
-    regNo: 'MED/2023/3419',
-    name: 'Victor Maina',
-    email: 'vmaina23@kabarak.ac.ke',
-    yearOfStudy: 'Year 3 (MBChB)',
-    status: 'Ineligible',
-    reason: 'Enrolled in School of Medicine (MBChB), not School of Pharmacy. Only KUPSA members vote in KUPSA elections.',
-    duesCleared: false,
-    academicGoodStanding: true
-  }
-];
+export const SAMPLE_STUDENTS: StudentRecord[] = [];
 
 export const READINESS_GATES: ReadinessGate[] = [
   {

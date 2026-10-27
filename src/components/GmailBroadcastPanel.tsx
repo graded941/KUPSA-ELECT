@@ -710,6 +710,7 @@ export function GmailBroadcastPanel() {
                   <option value="Year 3">Year 3</option>
                   <option value="Year 4">Year 4</option>
                   <option value="Year 5">Year 5</option>
+                  <option value="Masters">Masters</option>
                 </select>
               </div>
 

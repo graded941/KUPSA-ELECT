@@ -186,7 +186,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
 
   // Cohort participation metrics
   const cohortTurnout = useMemo(() => {
-    const cohorts = ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'];
+    const cohorts = ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Masters'];
     return cohorts.map((c) => {
       const cohortVotes = votes.filter((v) => v.voterYear === c).length;
       const cohortStudents = accreditationList.filter((s) => s.yearOfStudy === c).length || 1;
@@ -647,13 +647,13 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                     Cohort Participation Breakdown
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Turnout distribution across academic study cohorts (Year 1 to Year 5)
+                    Turnout distribution across academic study cohorts (Year 1 to Year 5, Masters)
                   </p>
                 </div>
-                <span className="text-xs font-mono text-muted-foreground">5 Cohorts Tracked</span>
+                <span className="text-xs font-mono text-muted-foreground">6 Cohorts Tracked</span>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-5">
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
                 {cohortTurnout.map((c) => (
                   <div key={c.cohort} className="rounded-xl border border-border bg-secondary/30 p-3 space-y-1.5">
                     <div className="flex justify-between items-center text-xs">
@@ -999,12 +999,13 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                 onChange={(e) => setVoterCohortFilter(e.target.value)}
                 className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-mono text-foreground focus:border-primary outline-none"
               >
-                <option value="all">All Cohorts (Year 1–5)</option>
+                <option value="all">All Cohorts (Year 1–5 & Masters)</option>
                 <option value="Year 1">Year 1</option>
                 <option value="Year 2">Year 2</option>
                 <option value="Year 3">Year 3</option>
                 <option value="Year 4">Year 4</option>
                 <option value="Year 5">Year 5</option>
+                <option value="Masters">Masters</option>
               </select>
 
               <select

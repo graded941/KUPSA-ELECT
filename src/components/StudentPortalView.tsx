@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ViewId, StudentRecord } from '../types';
-import { SAMPLE_STUDENTS, OFFICES, CANDIDATES } from '../data/election';
+import { OFFICES, CANDIDATES } from '../data/election';
 import { PageIntro } from './site-shell';
 import {
   CheckCircle2,
@@ -68,10 +68,7 @@ export function StudentPortalView({ onNavigate }: StudentPortalViewProps) {
       return;
     }
 
-    const found = SAMPLE_STUDENTS.find(
-      (s) => s.regNo.toUpperCase() === cleanReg
-    );
-    setResult(found ?? null);
+    setResult(null);
   };
 
   const handleQuickSelect = (reg: string) => {
@@ -93,8 +90,7 @@ export function StudentPortalView({ onNavigate }: StudentPortalViewProps) {
       });
       return;
     }
-    const found = SAMPLE_STUDENTS.find((s) => s.regNo.toUpperCase() === reg.toUpperCase());
-    setResult(found ?? null);
+    setResult(null);
   };
 
   const handleStartVoting = () => {
@@ -331,43 +327,43 @@ export function StudentPortalView({ onNavigate }: StudentPortalViewProps) {
               </div>
 
               {/* Sample students helper */}
-              <div className="rounded-2xl border-2 border-dashed border-border bg-secondary/50 p-6">
-                <p className="font-display text-base font-semibold text-foreground">
-                  Trying out the portal?
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Tap any simulated student below to immediately populate the check:
-                </p>
-                <div className="mt-3 space-y-2">
-                  {SAMPLE_STUDENTS.slice(0, 4).map((s) => (
-                    <button
-                      key={s.regNo}
-                      onClick={() => handleQuickSelect(s.regNo)}
-                      className="w-full flex items-center justify-between rounded-xl border border-border bg-card px-3.5 py-2 text-left hover:border-ink transition-colors"
-                    >
-                      <div>
-                        <span className="font-mono text-xs font-semibold text-foreground block">
-                          {s.regNo}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">
-                          {s.name} ({s.yearOfStudy.replace('Bachelor of Pharmacy ', '')})
-                        </span>
-                      </div>
-                      <span
-                        className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold ${
-                          s.status === 'Eligible'
-                            ? 'bg-success/15 text-success'
-                            : s.status === 'Action Required'
-                              ? 'bg-primary/15 text-primary'
-                              : 'bg-destructive/15 text-destructive'
-                        }`}
+              {accreditationList.length > 0 && (
+                <div className="rounded-2xl border-2 border-dashed border-border bg-secondary/50 p-6">
+                  <p className="font-display text-base font-semibold text-foreground">
+                    Accredited Voters
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Tap any registered student below to check official status:
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {accreditationList.slice(0, 4).map((s) => (
+                      <button
+                        key={s.regNo}
+                        onClick={() => handleQuickSelect(s.regNo)}
+                        className="w-full flex items-center justify-between rounded-xl border border-border bg-card px-3.5 py-2 text-left hover:border-ink transition-colors cursor-pointer"
                       >
-                        {s.status}
-                      </span>
-                    </button>
-                  ))}
+                        <div>
+                          <span className="font-mono text-xs font-semibold text-foreground block">
+                            {s.regNo}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {s.name} ({s.yearOfStudy.replace('Bachelor of Pharmacy ', '')})
+                          </span>
+                        </div>
+                        <span
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold ${
+                            s.status === 'Eligible'
+                              ? 'bg-success/15 text-success'
+                              : 'bg-amber-500/15 text-amber-800'
+                          }`}
+                        >
+                          {s.status}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </aside>
           </div>
         )}

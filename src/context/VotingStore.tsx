@@ -117,7 +117,7 @@ interface VotingStoreContextType {
   resetUserVoteStatus: (email: string) => void;
 
   // Auth actions
-  signUp: (name: string, email: string, yearOfStudy: string) => Promise<{ success: boolean; error?: string; password?: string; user?: VoterUser }>;
+  signUp: (name: string, email: string, yearOfStudy: string, regNo?: string) => Promise<{ success: boolean; error?: string; password?: string; user?: VoterUser }>;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: VoterUser }>;
   logout: () => void;
   castVote: (choices: Record<string, string>) => Promise<{ success: boolean; receiptCode: string; timestamp: string }>;
@@ -163,22 +163,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     } catch (e) {
       console.error(e);
     }
-    return [
-      {
-        email: 'john.doe@kabarak.ac.ke',
-        name: 'John Kipruto',
-        yearOfStudy: 'Year 3',
-        password: 'KUP-2026',
-        hasVoted: false,
-      },
-      {
-        email: 'sarah.cherono@kabarak.ac.ke',
-        name: 'Sarah Cherono',
-        yearOfStudy: 'Year 4',
-        password: 'KUP-2026',
-        hasVoted: false,
-      },
-    ];
+    return [];
   });
 
   const [currentUser, setCurrentUser] = useState<VoterUser | null>(() => {
@@ -198,16 +183,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     } catch (e) {
       console.error(e);
     }
-    return [
-      {
-        id: 'email-demo-1',
-        recipientEmail: 'john.doe@kabarak.ac.ke',
-        recipientName: 'John Kipruto',
-        subject: 'Your Official KUPSA Election Portal Password',
-        password: 'KUP-2026',
-        sentAt: 'Just now',
-      },
-    ];
+    return [];
   });
 
   // Convert DbBallot to internal CastVote
@@ -578,9 +554,10 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   // Sign up (Unified Server Authority: Backend generates cryptographic PIN and creates record)
-  const signUp = async (name: string, email: string, yearOfStudy: string) => {
+  const signUp = async (name: string, email: string, yearOfStudy: string, regNo?: string) => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = name.trim();
+    const cleanRegNo = (regNo || '').trim().toUpperCase();
 
     if (!cleanEmail.endsWith('@kabarak.ac.ke')) {
       return { success: false, error: 'Use your Kabarak student email ending in @kabarak.ac.ke' };
@@ -590,16 +567,33 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return { success: false, error: 'Full name is required' };
     }
 
+    const KUPSA_REG_NO_REGEX = /^PHAM\/(M|MK|MG)\/\d{4}\/\d{2}\/\d{2}$/i;
+    if (!cleanRegNo || !KUPSA_REG_NO_REGEX.test(cleanRegNo)) {
+      return {
+        success: false,
+        error: 'Registration number must match official format: either PHAM/M/0000/00/00, PHAM/MK/0000/00/00, or PHAM/MG/0000/00/00',
+      };
+    }
+
+    // Client-side duplicate verification
+    if (users.some((u) => u.email.toLowerCase() === cleanEmail)) {
+      return { success: false, error: 'This student email is already registered. Please log in with your credentials.' };
+    }
+    if (users.some((u) => u.regNo?.toUpperCase() === cleanRegNo) || accreditationList.some((s) => s.regNo?.toUpperCase() === cleanRegNo)) {
+      return { success: false, error: `Registration number '${cleanRegNo}' is already registered in the voter roll.` };
+    }
+
     try {
       // 1. Call server API to create account and generate cryptographic 6-digit PIN
       const regRes = await registerVoterApi({
         name: cleanName,
         email: cleanEmail,
         yearOfStudy,
+        regNo: cleanRegNo,
       });
 
       const serverPin = regRes.password || regRes.user?.password || 'KUP-2026';
-      const assignedRegNo = regRes.regNo || regRes.user?.regNo;
+      const assignedRegNo = regRes.regNo || regRes.user?.regNo || cleanRegNo;
 
       const newUser: VoterUser = {
         email: cleanEmail,
@@ -655,6 +649,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
           email: serverAuth.user.email,
           name: serverAuth.user.name,
           yearOfStudy: serverAuth.user.yearOfStudy,
+          regNo: serverAuth.user.regNo,
           password: serverAuth.user.password || cleanPass,
           hasVoted: serverAuth.user.hasVoted,
           votedAt: serverAuth.user.votedAt || undefined,
@@ -663,6 +658,29 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
         setCurrentUser(verifiedUser);
         setUsers((prev) => [verifiedUser, ...prev.filter((u) => u.email.toLowerCase() !== verifiedUser.email.toLowerCase())]);
+
+        // When a voter logs in for the first time with their password, ensure they are registered in accreditationList
+        setAccreditationList((prev) => {
+          const idx = prev.findIndex((s) => s.email.toLowerCase() === verifiedUser.email.toLowerCase());
+          const record: StudentAccreditationRecord = {
+            regNo: verifiedUser.regNo || '',
+            name: verifiedUser.name,
+            email: verifiedUser.email,
+            yearOfStudy: verifiedUser.yearOfStudy,
+            status: 'Eligible',
+            reason: 'Accredited in official registry upon credential login.',
+            hasVoted: Boolean(verifiedUser.hasVoted),
+          };
+          if (idx >= 0) {
+            const copy = [...prev];
+            copy[idx] = { ...copy[idx], ...record };
+            return copy;
+          }
+          return [record, ...prev];
+        });
+
+        refreshDbState();
+
         return { success: true, user: verifiedUser };
       }
     } catch (apiErr: any) {
@@ -818,7 +836,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const totalRegistered = useMemo(() => {
-    return Math.max(accreditationList.length, 384);
+    return accreditationList.length;
   }, [accreditationList]);
 
   return (
