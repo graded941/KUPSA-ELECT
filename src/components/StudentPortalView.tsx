@@ -32,12 +32,13 @@ export function StudentPortalView({ onNavigate }: StudentPortalViewProps) {
   const [otpCode, setOtpCode] = useState('');
   const [otpVerified, setOtpVerified] = useState(false);
   const [ballotSelections, setBallotSelections] = useState<Record<string, string>>({
-    chairperson: 'cand-01',
-    'vice-chairperson': 'cand-03',
-    'sec-general': 'cand-04',
-    treasurer: 'cand-05',
-    'org-sec': 'cand-07',
-    'academic-sec': 'cand-09',
+    president: 'cand-pres-01',
+    'vice-president': 'cand-vp-01',
+    'sec-general': 'cand-sg-01',
+    'dep-sec-general': 'cand-dsg-01',
+    treasurer: 'cand-tres-01',
+    'media-officer': 'cand-media-01',
+    'org-sec': 'cand-org-01',
   });
   const [receiptData, setReceiptData] = useState<{
     receiptId: string;

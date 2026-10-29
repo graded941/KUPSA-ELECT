@@ -13,6 +13,7 @@ export interface SharedCandidate {
   priorities?: { title: string; desc: string; timeline: string }[];
   qa?: { question: string; answer: string }[];
   status: 'Cleared' | 'Vetted & Approved';
+  unopposed?: boolean;
   complianceChecklist?: { rule: string; passed: boolean; reference: string }[];
 }
 
@@ -59,19 +60,11 @@ export const SHARED_OFFICES: SharedOffice[] = [
     term: '2026/2027 Academic Year'
   },
   {
-    id: 'org-sec',
-    title: 'Organizing Secretary',
-    description: 'Directs Pharmacy Week outreach, community health camps, industrial pharmaceutical manufacturer tours, and sports.',
-    seats: 1,
-    constitutionalArticle: 'Article 42(5)',
-    term: '2026/2027 Academic Year'
-  },
-  {
     id: 'treasurer',
     title: 'Treasurer',
     description: 'Custodian of association funds, annual budgets, Pharmacy Gala books, and certified audited accounts.',
     seats: 1,
-    constitutionalArticle: 'Article 42(6)',
+    constitutionalArticle: 'Article 42(5)',
     term: '2026/2027 Academic Year'
   },
   {
@@ -79,455 +72,383 @@ export const SHARED_OFFICES: SharedOffice[] = [
     title: 'Media and Publications Officer',
     description: 'Directs association public affairs, press statements, digital student bulletins, and the Pharmakon scientific journal.',
     seats: 1,
+    constitutionalArticle: 'Article 42(6)',
+    term: '2026/2027 Academic Year'
+  },
+  {
+    id: 'org-sec',
+    title: 'Organizing Secretary',
+    description: 'Directs Pharmacy Week outreach, community health camps, industrial pharmaceutical manufacturer tours, and sports.',
+    seats: 1,
     constitutionalArticle: 'Article 42(7)',
     term: '2026/2027 Academic Year'
   }
 ];
 
-// Single canonical array of candidates, ordered neutrally (alphabetical) per office
+// Official list of certified candidates across the 7 constitutional portfolios (without admission numbers)
 export const SHARED_CANDIDATES: SharedCandidate[] = [
-  // The President
+  // 1. PRESIDENT
   {
-    id: 'cand-01',
-    name: 'Amina Muthoni',
-    initials: 'AM',
+    id: 'cand-pres-01',
+    name: 'Wambua Titus',
+    initials: 'WT',
     officeId: 'president',
     officeTitle: 'The President',
-    yearOfStudy: 'Bachelor of Pharmacy (Year 4)',
-    status: 'Cleared',
-    photoPlaceholderBg: '#286746',
-    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    manifestoSummary: 'Dedicated to expanding pharmaceutical industry internships, student mental health support, and transparent executive accountability.',
-    manifestoPillars: [
-      'Expand regional pharmaceutical hospital & laboratory attachments by 40%',
-      'Launch a transparent termly financial bulletin for all KUPSA members',
-      'Institute peer-led pharmacology & medicinal chemistry tutorials'
-    ],
-    experience: [
-      'Vice Chairperson, Kabarak Health Sciences Student Guild (2025)',
-      'Clinical Pharmacy Attachment, Nakuru Level 5 Hospital (August 2025)',
-      'Lead Convener, 2024 Rift Valley Young Pharmacists Symposium',
-      'Class Representative, B.Pharm Class of 2027'
-    ],
-    priorities: [
-      {
-        title: 'Industrial & Hospital Placement Pipeline',
-        desc: 'Formalize MoUs with 15 leading pharmaceutical manufacturers and county referral facilities for guaranteed clinical rotations.',
-        timeline: 'Q1 2027'
-      },
-      {
-        title: 'Real-Time Financial Transparency Ledger',
-        desc: 'Publish monthly executive income/expense sheets directly to the student portal with dual-signatory receipts.',
-        timeline: 'Immediate'
-      },
-      {
-        title: 'Board Exam Preparation & Peer Tutorials',
-        desc: 'Institutionalize weekend mock exams and pharmacology review seminars ahead of Pharmacy and Poisons Board assessments.',
-        timeline: 'Q2 2027'
-      }
-    ],
-    qa: [
-      {
-        question: 'How will you fund the promised hospital attachments stipends?',
-        answer: 'We will ring-fence 25% of corporate sponsorship revenues from Pharmacy Week and collaborate with the Dean of Pharmacy on joint county liaison.'
-      },
-      {
-        question: 'What is your plan for addressing student grievances during exam periods?',
-        answer: 'Establish a 24-hour academic liaison channel directly to the Faculty Board of Examiners under constitutional Article 42.'
-      }
-    ],
-    complianceChecklist: [
-      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
-      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
-      { rule: 'No active disciplinary infractions', passed: true, reference: 'Art. 42(d)' },
-      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
-    ]
-  },
-  {
-    id: 'cand-02',
-    name: 'Brian Kiprop',
-    initials: 'BK',
-    officeId: 'president',
-    officeTitle: 'The President',
-    yearOfStudy: 'Bachelor of Pharmacy (Year 4)',
-    status: 'Cleared',
-    photoPlaceholderBg: '#194a31',
-    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-    manifestoSummary: 'Focusing on student scientific symposium sponsorship, laboratory material supplies advocacy, and clinical pharmacy round exchanges.',
-    manifestoPillars: [
-      'Establish student travel grants for national pharmaceutical conferences',
-      'Strengthen dialogue with the Dean on compounding lab equipment upgrades',
-      'Organize the 2027 Annual Rift Valley Pharmacy Health Caravan'
-    ],
-    experience: [
-      'Head of Academic Affairs, Pharmaceutical Research Society (2025)',
-      'Research Assistant, Kabarak Natural Products & Phytochemistry Lab',
-      '1st Place, National Young Pharmacist Innovation Pitch (KPA 2025)',
-      'Peer Tutor in Medicinal Chemistry & Pharmacognosy'
-    ],
-    priorities: [
-      {
-        title: 'Modern Laboratory Instrumentation Advocacy',
-        desc: 'Submit a formal petition backed by student signatures to fast-track modern dissolution and HPLC apparatus upgrades.',
-        timeline: 'Q1 2027'
-      },
-      {
-        title: 'PSK National Conference Travel Grants',
-        desc: 'Secure corporate grants to sponsor 12 students presenting research abstracts at the Pharmaceutical Society of Kenya Annual Conference.',
-        timeline: 'Q2 2027'
-      },
-      {
-        title: 'Cross-County Pharmacy Outreach Caravan',
-        desc: 'Mobilize 150 students for community screening and patient education drives across Nakuru and Baringo counties.',
-        timeline: 'Q3 2027'
-      }
-    ],
-    qa: [
-      {
-        question: 'How do you plan to resolve equipment bottlenecks in practicals?',
-        answer: 'By working with chief laboratory technologists to schedule flexible evening bench hours and procure supplementary glassware kits.'
-      },
-      {
-        question: 'Why should students choose your leadership over traditional campaigns?',
-        answer: 'I focus on tangible academic outcomes, verifiable research support, and clinical excellence that elevates our pharmacy degree.'
-      }
-    ],
-    complianceChecklist: [
-      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
-      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
-      { rule: 'No active disciplinary infractions', passed: true, reference: 'Art. 42(d)' },
-      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
-    ]
-  },
-
-  // Vice President
-  {
-    id: 'cand-03',
-    name: 'Faith Chebet',
-    initials: 'FC',
-    officeId: 'vice-president',
-    officeTitle: 'Vice President',
     yearOfStudy: 'Bachelor of Pharmacy (Year 3)',
-    status: 'Cleared',
-    photoPlaceholderBg: '#365314',
-    photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80',
-    manifestoSummary: 'Prioritizing freshman integration into pharmacy school, mentorship pairing with practicing hospital pharmacists, and welfare emergency funds.',
+    status: 'Vetted & Approved',
+    photoPlaceholderBg: '#1e3a8a',
+    manifestoSummary: 'Advancing academic excellence, student representation in faculty governance, and pharmaceutical industry mentorship.',
     manifestoPillars: [
-      'Pair 100% of incoming pharmacy freshers with senior peer guides',
-      'Establish a formal KUPSA student welfare and emergency medicine fund',
-      'Curate monthly professional networking dinners with alumni'
+      'Represent pharmacy student interests in University Senate and Faculty Board',
+      'Foster clinical rotation sponsorships and national hospital attachments',
+      'Ensure transparent executive accountability and termly town halls'
     ],
     experience: [
-      'Secretary, Kabarak Red Cross Student Chapter (2024–2025)',
-      'Coordinator, Pharmacy Peer Counseling Program',
-      'Community Health Volunteer, Baringo County Medical Mission'
-    ],
-    priorities: [
-      {
-        title: 'Structured Peer Mentorship Academy',
-        desc: 'Provide every Year 1 & Year 2 student a dedicated upper-year mentor for biochemistry and pharmaceutical math support.',
-        timeline: 'Orientation 2027'
-      },
-      {
-        title: 'Emergency Student Welfare & Rx Relief Fund',
-        desc: 'Establish an independently overseen contingency reserve to assist students experiencing sudden medical or personal emergencies.',
-        timeline: 'Q1 2027'
-      },
-      {
-        title: 'Executive Alumni Networking Roundtables',
-        desc: 'Host bi-monthly intimate dinners connecting current students with community pharmacy proprietors and hospital chief pharmacists.',
-        timeline: 'Monthly'
-      }
-    ],
-    qa: [
-      {
-        question: 'How will the welfare fund be governed to avoid favoritism?',
-        answer: 'Applications will be reviewed anonymously by a tripartite committee consisting of the Patron, Vice Chairperson, and student welfare lead.'
-      }
+      'Active Student Representative, School of Pharmacy',
+      'Lead Coordinator, Kabarak Medical Outreach 2025'
     ],
     complianceChecklist: [
       { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
       { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
-      { rule: 'No active disciplinary infractions', passed: true, reference: 'Art. 42(d)' },
       { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
     ]
   },
   {
-    id: 'cand-07',
-    name: 'Sharon Nekesa',
-    initials: 'SN',
-    officeId: 'vice-president',
-    officeTitle: 'Vice President',
-    yearOfStudy: 'Bachelor of Pharmacy (Year 4)',
-    status: 'Cleared',
-    photoPlaceholderBg: '#0f766e',
-    photoUrl: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&w=400&q=80',
-    manifestoSummary: 'Championing practical clinical ward rounds, student mental health hotlines, and transparent hostel welfare conditions.',
+    id: 'cand-pres-02',
+    name: 'Mputhia Mark Mwenda',
+    initials: 'MMM',
+    officeId: 'president',
+    officeTitle: 'The President',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 2)',
+    status: 'Vetted & Approved',
+    photoPlaceholderBg: '#065f46',
+    manifestoSummary: 'Unifying all pharmacy cohorts, elevating pharmacy student welfare, and championing innovative clinical skills workshops.',
     manifestoPillars: [
-      'Advocate for protected clinical rotation shifts with Nakuru referral hospital',
-      'Launch an anonymous peer mental wellness support desk',
-      'Initiate quarterly Dean-student town halls on curriculum delivery'
+      'Launch peer-led pharmacology mastery tutorials and resource banks',
+      'Streamline emergency student welfare assistance',
+      'Expand regional medical camps and community health engagements'
     ],
     experience: [
-      'Clinical Rotation Representative, Level 5 Hospital',
-      'President, Kabarak Women in Science Initiative (2024)',
-      'Lead Debater, Inter-faculty Bioethics Forum'
-    ],
-    priorities: [
-      {
-        title: 'Clinical Ward Preceptorship Expansion',
-        desc: 'Work with hospital clinical instructors to ensure bedside dosing calculation experience.',
-        timeline: 'Q1 2027'
-      },
-      {
-        title: 'Pharmacy Mental Health Resilience Desk',
-        desc: 'Partner with University counseling for confidential, stigma-free counseling sessions.',
-        timeline: 'Immediate'
-      }
+      'Coordinator, Pharmacy Peer Tutoring Program',
+      'Committee Member, Health Week Logistics'
     ],
     complianceChecklist: [
       { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
       { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
-      { rule: 'No active disciplinary infractions', passed: true, reference: 'Art. 42(d)' },
       { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
     ]
   },
 
-  // Secretary General
+  // 2. VICE PRESIDENT (Elected Unopposed)
   {
-    id: 'cand-04',
-    name: 'Dennis Omondi',
-    initials: 'DO',
+    id: 'cand-vp-01',
+    name: 'Oire Valarie Bonareri',
+    initials: 'OVB',
+    officeId: 'vice-president',
+    officeTitle: 'Vice President',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 2)',
+    status: 'Vetted & Approved',
+    unopposed: true,
+    photoPlaceholderBg: '#831843',
+    manifestoSummary: 'Elected unopposed. Dedicated to student welfare, freshman peer mentorship, and hospital clinical rotation attachments.',
+    manifestoPillars: [
+      'Comprehensive mentorship pairing for incoming cohorts',
+      'Protected clinical ward round scheduling and student academic support',
+      'Promote mental wellness and inclusive pharmacy community events'
+    ],
+    experience: [
+      'Vice Lead, Student Mentorship Academy',
+      'Active Volunteer, Nakuru Community Health Drive'
+    ],
+    complianceChecklist: [
+      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
+      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
+      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
+    ]
+  },
+
+  // 3. SECRETARY GENERAL
+  {
+    id: 'cand-sg-01',
+    name: 'Ndema Paul Antony',
+    initials: 'NPA',
     officeId: 'sec-general',
     officeTitle: 'Secretary General',
-    yearOfStudy: 'Bachelor of Pharmacy (Year 3)',
-    status: 'Cleared',
-    photoPlaceholderBg: '#1e3a8a',
-    photoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-    manifestoSummary: 'Digitizing all KUPSA archives, publishing meeting minutes within 48 hours, and maintaining an active student bulletin board.',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 2)',
+    status: 'Vetted & Approved',
+    photoPlaceholderBg: '#1f2937',
+    manifestoSummary: 'Institutional transparency, prompt dissemination of meeting minutes, and seamless communication between executive and students.',
     manifestoPillars: [
-      'Digital public repository for all KUPSA meeting records',
-      'Bi-weekly newsletter featuring internship openings and academic notices',
-      'Automated association membership cards and certificate distribution'
+      'Publish executive resolutions within 48 hours of sittings',
+      'Establish a digital constitutional archive and circular portal',
+      'Streamline official communication with student class representatives'
     ],
     experience: [
-      'Editor-in-Chief, The Kabarak Pharmakon Journal',
-      'Secretary, Health Sciences Debating Union',
-      'Digital Archivist for University Student Council'
-    ],
-    priorities: [
-      {
-        title: 'Public Digital Minutes & Resolution Tracker',
-        desc: 'All executive decisions and constitutional votes published within 48 hours to prevent backroom resolutions.',
-        timeline: 'Immediate'
-      },
-      {
-        title: 'The Pharmacy Weekly Dispatch',
-        desc: 'Curated e-newsletter sent directly to all pharmacy students featuring vetted internships, webinars, and deadlines.',
-        timeline: 'Bi-weekly'
-      }
-    ],
-    qa: [
-      {
-        question: 'How will you guarantee that executive meetings will be released on time?',
-        answer: 'I will mandate standard audio recording and publish summary resolutions within 48 hours with executive secretary sign-off.'
-      }
+      'Cohort Secretary, Class of 2028',
+      'Documentation Officer, Pharmacy Academic Forum'
     ],
     complianceChecklist: [
       { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
       { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
-      { rule: 'No active disciplinary infractions', passed: true, reference: 'Art. 42(d)' },
+      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
+    ]
+  },
+  {
+    id: 'cand-sg-02',
+    name: 'Isabell Njoki',
+    initials: 'IN',
+    officeId: 'sec-general',
+    officeTitle: 'Secretary General',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 1)',
+    status: 'Vetted & Approved',
+    photoPlaceholderBg: '#4c1d95',
+    manifestoSummary: 'Diligent documentation, accessible student inquiries, and transparent association affairs.',
+    manifestoPillars: [
+      'Timely gazettement of KUPSA notices and academic activities',
+      'Open digital correspondence desk for all student inquiries',
+      'Accurate historical records and comprehensive annual executive reports'
     ],
+    experience: [
+      'Freshman Class Liaison Officer',
+      'Member, Student Debate & Communications Society'
+    ],
+    complianceChecklist: [
+      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
+      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
+      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
+    ]
+  },
+  {
+    id: 'cand-sg-03',
+    name: 'Ian Mark Makokha',
+    initials: 'IMM',
+    officeId: 'sec-general',
+    officeTitle: 'Secretary General',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 2)',
+    status: 'Vetted & Approved',
+    photoPlaceholderBg: '#0f766e',
+    manifestoSummary: 'Streamlined executive administration, dynamic student engagements, and prompt official bulletins.',
+    manifestoPillars: [
+      'Modernize association digital records and circular workflows',
+      'Facilitate active inter-cohort communication networks',
+      'Ensure strict constitutional compliance across all executive meetings'
+    ],
+    experience: [
+      'Assistant Secretary, Health Sciences Coalition',
+      'Administrative Liaison, KUPSA Annual General Meeting'
+    ],
+    complianceChecklist: [
+      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
+      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
+      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
+    ]
   },
 
-  // Deputy Secretary General
+  // 4. DEPUTY SECRETARY GENERAL
   {
-    id: 'cand-08',
-    name: 'Wairimu Njeri',
-    initials: 'WN',
+    id: 'cand-dsg-01',
+    name: 'Avyona Sarah Precious',
+    initials: 'ASP',
     officeId: 'dep-sec-general',
     officeTitle: 'Deputy Secretary General',
-    yearOfStudy: 'Bachelor of Pharmacy (Year 3)',
-    status: 'Cleared',
-    photoPlaceholderBg: '#4338ca',
-    photoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80',
-    manifestoSummary: 'Assisting in rigorous executive record-keeping, committee documentation, and swift correspondence dispatch.',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 1)',
+    status: 'Vetted & Approved',
+    photoPlaceholderBg: '#701a75',
+    manifestoSummary: 'Supporting administrative excellence, cohort-wide liaison, and meticulous record keeping.',
     manifestoPillars: [
-      'Assist in digitizing past 5 years of KUPSA constitutional resolutions',
-      'Ensure committee meeting minutes are finalized within 24 hours',
-      'Establish a centralized notice archive accessible by all pharmacy cohorts'
+      'Support timely execution and backup of all Secretariat duties',
+      'Bridge lower and upper cohort communications effectively',
+      'Maintain reliable association records and calendar tracking'
     ],
     experience: [
-      'Assistant Secretary, Pharmacy Academic Mentorship Forum',
-      'Peer Counselor and Records Assistant, Health Sciences Guild',
-      'Lead Scribe, 2025 Rift Valley Students Leadership Workshop'
-    ],
-    priorities: [
-      {
-        title: 'Institutional Archive Digitization',
-        desc: 'Scan and index historical constitution amendments and executive records into a searchable vault.',
-        timeline: 'Q1 2027'
-      },
-      {
-        title: 'Sub-Committee Documentation Support',
-        desc: 'Standardize minute templates across all executive standing committees.',
-        timeline: 'Immediate'
-      }
-    ],
-    qa: [
-      {
-        question: 'How will you collaborate with the Secretary General?',
-        answer: 'I will coordinate directly on daily docket maintenance and ensure committee records are synchronized without delay.'
-      }
+      'Member, KUPSA Secretariat Support Team',
+      'Event Coordinator, World Pharmacists Day 2025'
     ],
     complianceChecklist: [
       { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
       { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
-      { rule: 'No active disciplinary infractions', passed: true, reference: 'Art. 42(d)' },
+      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
+    ]
+  },
+  {
+    id: 'cand-dsg-02',
+    name: 'Nicole Chebet',
+    initials: 'NC',
+    officeId: 'dep-sec-general',
+    officeTitle: 'Deputy Secretary General',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 1)',
+    status: 'Vetted & Approved',
+    photoPlaceholderBg: '#155e75',
+    manifestoSummary: 'Active secretariat support, efficient event documentation, and responsive student coordination.',
+    manifestoPillars: [
+      'Rapid notification of association circulars and study timetables',
+      'Comprehensive minute archiving for all committee sessions',
+      'Assist student welfare initiatives through organized secretarial support'
+    ],
+    experience: [
+      'Secretary, Kabarak Red Cross Student Division',
+      'Freshman Peer Mentor'
+    ],
+    complianceChecklist: [
+      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
+      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
       { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
     ]
   },
 
-  // Organizing Secretary
+  // 5. TREASURER (Elected Unopposed)
   {
-    id: 'cand-05',
-    name: 'Mercy Wanjiku',
-    initials: 'MW',
+    id: 'cand-tres-01',
+    name: 'Otieno Daniel Shukran',
+    initials: 'ODS',
     officeId: 'treasurer',
     officeTitle: 'Treasurer',
-    yearOfStudy: 'Bachelor of Pharmacy (Year 4)',
-    status: 'Cleared',
-    photoPlaceholderBg: '#78350f',
-    photoUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=400&q=80',
-    manifestoSummary: 'Strict financial discipline, transparent budgeting with zero unaccounted petty cash, and audited accounts published before every AGM.',
-    manifestoPillars: [
-      'Audited quarterly financial statements displayed on portal',
-      'Zero unauthorized expenditures; strict two-signatory compliance',
-      'Maximize pharmacy week sponsorships to lower student contribution fees'
-    ],
-    experience: [
-      'Treasurer, Kabarak University Finance & Investment Club',
-      'Internal Auditor Assistant, Student Guild Accounts',
-      'Passed CPA Section 1 with distinctions in financial accounting'
-    ],
-    priorities: [
-      {
-        title: 'Open Real-Time Financial Ledger',
-        desc: 'Students can inspect all debits, credits, and sponsorship remittances in a secure public read-only portal view.',
-        timeline: 'Q1 2027'
-      },
-      {
-        title: 'Dual-Signatory Anti-Mismanagement Protocol',
-        desc: 'Enforce strict Article 42(4) compliance where no withdrawal occurs without written approval from the Staff Patron.',
-        timeline: 'Immediate'
-      }
-    ],
-    qa: [
-      {
-        question: 'What happens if a project runs over budget?',
-        answer: 'Any budget reallocation over 5% requires emergency executive vote and immediate publication to the association ledger.'
-      }
-    ],
-    complianceChecklist: [
-      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
-      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
-      { rule: 'No active disciplinary infractions', passed: true, reference: 'Art. 42(d)' },
-      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
-    ]
-  },
-
-  // Organizing Secretary
-  {
-    id: 'cand-06',
-    name: 'Kevin Kibet',
-    initials: 'KK',
-    officeId: 'org-sec',
-    officeTitle: 'Organizing Secretary',
-    yearOfStudy: 'Bachelor of Pharmacy (Year 2)',
-    status: 'Cleared',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 1)',
+    status: 'Vetted & Approved',
+    unopposed: true,
     photoPlaceholderBg: '#14532d',
-    photoUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
-    manifestoSummary: 'Energizing the pharmacy community through impactful community medical drives, inter-faculty sports, and memorable annual dinners.',
+    manifestoSummary: 'Elected unopposed. Prudent financial stewardship, transparent budget reporting, and timely funding for student events.',
     manifestoPillars: [
-      'Organize two multi-county pharmacy outreach caravans in Nakuru & Baringo',
-      'Revive the annual Kabarak Pharmacy Sports Gala and quiz competition',
-      'Facilitate factory visits to leading Kenyan pharmaceutical manufacturers'
+      'Publish termly itemized financial statements and balance sheets',
+      'Prudently disburse funds for Pharmacy Week and community health camps',
+      'Ensure absolute accountability and integrity in all KUPSA expenditures'
     ],
     experience: [
-      'Sports Captain, School of Pharmacy (2024–2025)',
-      'Lead Logistics Coordinator, Kabarak Health Week 2024',
-      'Volunteer, Kenya Red Cross Disaster Response Team'
-    ],
-    priorities: [
-      {
-        title: 'Pharmacy Industrial Plant Excursions',
-        desc: 'Organize three subsidized study tours to pharmaceutical manufacturing plants in Nairobi, Thika, and Athi River.',
-        timeline: 'Semester 2'
-      },
-      {
-        title: 'Annual Inter-Class Pharmaceutical Derby',
-        desc: 'Organize football, basketball, and academic quiz matches between Years 1 through 5 to build cross-cohort unity.',
-        timeline: 'Termly'
-      }
-    ],
-    qa: [
-      {
-        question: 'As a Year 2 student, do you have enough time to manage complex logistics?',
-        answer: 'My work coordinating Health Week proved that effective delegation, digital checklists, and teamwork deliver world-class events.'
-      }
+      'Finance Committee Member, School of Pharmacy',
+      'Audit Assistant, Health Sciences Association'
     ],
     complianceChecklist: [
       { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
       { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
-      { rule: 'No active disciplinary infractions', passed: true, reference: 'Art. 42(d)' },
       { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
     ]
   },
 
-  // Media and Publications Officer
+  // 6. MEDIA AND PUBLICATIONS OFFICER
   {
-    id: 'cand-09',
-    name: 'Stacy Akinyi',
-    initials: 'SA',
+    id: 'cand-media-01',
+    name: 'Jasmine Jeptoo Jepkosgei',
+    initials: 'JJJ',
     officeId: 'media-officer',
     officeTitle: 'Media and Publications Officer',
     yearOfStudy: 'Bachelor of Pharmacy (Year 2)',
-    status: 'Cleared',
-    photoPlaceholderBg: '#047857',
-    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    manifestoSummary: 'Directing association public affairs, press statements, digital student bulletins, and the Pharmakon scientific journal.',
+    status: 'Vetted & Approved',
+    photoPlaceholderBg: '#854d0e',
+    manifestoSummary: 'Transforming KUPSA digital presence, highlighting student research, and publishing engaging pharmacy newsletters.',
     manifestoPillars: [
-      'Publish quarterly peer-reviewed student issues of The Kabarak Pharmakon',
-      'Revamp KUPSA social presence and student press communiqués',
-      'Host inter-school medical podcast and video roundtable series'
+      'Revamp social media outreach and professional LinkedIn presence',
+      'Feature student clinical research and scientific achievements',
+      'Produce regular visual and video recaps of school events'
     ],
     experience: [
-      'Associate Editor, The Kabarak Pharmakon Journal',
-      'Media Team Lead, Kabarak Health Week 2025',
-      'Certified Medical Communications Fellow'
-    ],
-    priorities: [
-      {
-        title: 'Pharmakon Scientific Journal Relaunch',
-        desc: 'Enable student research abstract publication with ISSN accreditation.',
-        timeline: 'Q1 2027'
-      },
-      {
-        title: 'Digital Media Newsroom',
-        desc: 'Deliver weekly graphic summaries of pharmacy opportunities and school updates.',
-        timeline: 'Immediate'
-      }
-    ],
-    qa: [
-      {
-        question: 'How will you elevate student research visibility?',
-        answer: 'By partnering with the Faculty Dean to feature outstanding pharmacy student abstracts in both digital bulletins and national forums.'
-      }
+      'Editor, The Pharmakon Student Bulletin',
+      'Lead Graphic Designer, Health Sciences Expo 2025'
     ],
     complianceChecklist: [
       { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
       { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
-      { rule: 'No active disciplinary infractions', passed: true, reference: 'Art. 42(d)' },
+      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
+    ]
+  },
+  {
+    id: 'cand-media-02',
+    name: 'Oyabi Joan',
+    initials: 'OJ',
+    officeId: 'media-officer',
+    officeTitle: 'Media and Publications Officer',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 2)',
+    status: 'Vetted & Approved',
+    photoPlaceholderBg: '#7c2d12',
+    manifestoSummary: 'Creative media campaigns, informative public health bulletins, and vibrant association branding.',
+    manifestoPillars: [
+      'Launch student-driven pharmaceutical awareness campaigns',
+      'Deliver informative digital pharmacy infographics and revision summaries',
+      'Document and broadcast all KUPSA symposia and academic events'
+    ],
+    experience: [
+      'Digital Media Manager, Pharmacy Student Association',
+      'Content Creator, Public Health Awareness Outreach'
+    ],
+    complianceChecklist: [
+      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
+      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
+      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
+    ]
+  },
+  {
+    id: 'cand-media-03',
+    name: 'Victor Perur',
+    initials: 'VP',
+    officeId: 'media-officer',
+    officeTitle: 'Media and Publications Officer',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 1)',
+    status: 'Vetted & Approved',
+    photoPlaceholderBg: '#374151',
+    manifestoSummary: 'Amplifying student voices, innovative digital design, and timely broadcast of association opportunities.',
+    manifestoPillars: [
+      'Expand pharmacy career and internship broadcast channels',
+      'Establish a monthly multimedia student spotlight series',
+      'Enhance the aesthetic branding of all official publications'
+    ],
+    experience: [
+      'Media Team Member, Kabarak University Annual Conference',
+      'Communications Liaison, Class of 2029'
+    ],
+    complianceChecklist: [
+      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
+      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
+      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
+    ]
+  },
+
+  // 7. ORGANIZING SECRETARY
+  {
+    id: 'cand-org-01',
+    name: 'Nancy Njoroge Munjiru',
+    initials: 'NNM',
+    officeId: 'org-sec',
+    officeTitle: 'Organizing Secretary',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 2)',
+    status: 'Vetted & Approved',
+    photoPlaceholderBg: '#1e40af',
+    manifestoSummary: 'Organizing impactful health outreaches, memorable social events, and well-structured industrial pharmaceutical tours.',
+    manifestoPillars: [
+      'Execute high-impact Kabarak Pharmacy Week and medical camps',
+      'Coordinate factory tours to leading pharmaceutical manufacturing plants',
+      'Foster cohort unity through inter-year sports and annual gala evenings'
+    ],
+    experience: [
+      'Logistics Lead, Nakuru Free Medical Mission',
+      'Assistant Events Coordinator, Health Week 2025'
+    ],
+    complianceChecklist: [
+      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
+      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
+      { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
+    ]
+  },
+  {
+    id: 'cand-org-02',
+    name: 'Ibrahim Khalif',
+    initials: 'IK',
+    officeId: 'org-sec',
+    officeTitle: 'Organizing Secretary',
+    yearOfStudy: 'Bachelor of Pharmacy (Year 1)',
+    status: 'Vetted & Approved',
+    photoPlaceholderBg: '#047857',
+    manifestoSummary: 'Dynamic event planning, collaborative community health initiatives, and vibrant student extracurriculars.',
+    manifestoPillars: [
+      'Seamless logistical coordination for all KUPSA activities',
+      'Engaging academic symposia and clinical skills competitions',
+      'Strengthen partnerships with local hospitals and community pharmacies'
+    ],
+    experience: [
+      'Sports & Recreation Captain, Class of 2029',
+      'Volunteer, Red Cross Community Health Aid'
+    ],
+    complianceChecklist: [
+      { rule: 'Valid Kabarak Pharmacy enrollment', passed: true, reference: 'Art. 42(a)' },
+      { rule: 'Cumulative GPA above 3.0 threshold', passed: true, reference: 'Art. 42(c)' },
       { rule: 'Signed Commission Code of Conduct', passed: true, reference: 'Art. 44(2)' }
     ]
   }

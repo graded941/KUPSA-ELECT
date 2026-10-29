@@ -6,7 +6,13 @@ import express from 'express';
 import app from './src/server/api.js';
 import { NotificationOutbox } from './src/server/notification-outbox.js';
 
-dotenv.config();
+dotenv.config({ override: true });
+if (process.env.VITE_SUPABASE_URL) {
+  process.env.VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL.replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
+}
+if (process.env.SUPABASE_URL) {
+  process.env.SUPABASE_URL = process.env.SUPABASE_URL.replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

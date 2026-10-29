@@ -70,6 +70,9 @@ export function BallotView({ onNavigate }: BallotViewProps) {
   const effectiveCandidates: SharedCandidate[] = useMemo(() => {
     if (dbCandidates.length > 0) {
       return dbCandidates.map((c) => {
+        const shared = SHARED_CANDIDATES.find(
+          (sc) => sc.id === c.id || sc.name.toLowerCase() === c.name.toLowerCase()
+        );
         const off = effectiveOffices.find((o) => o.id === c.office_id);
         const initials = c.name
           .split(' ')
@@ -81,19 +84,20 @@ export function BallotView({ onNavigate }: BallotViewProps) {
         return {
           id: c.id,
           name: c.name,
-          initials: initials || 'CA',
+          initials: shared?.initials || initials || 'CA',
           officeId: c.office_id,
           officeTitle: off ? off.title : 'Executive Seat',
-          yearOfStudy: c.year_of_study || 'Bachelor of Pharmacy',
+          yearOfStudy: c.year_of_study || shared?.yearOfStudy || 'Bachelor of Pharmacy',
           status: 'Cleared' as const,
-          photoUrl: c.photo_url,
-          photoPlaceholderBg: '#0B1B3D',
-          manifestoSummary: c.manifesto_summary || 'Serving pharmacy students with transparency.',
-          manifestoPillars: [
+          photoUrl: c.photo_url || shared?.photoUrl,
+          photoPlaceholderBg: shared?.photoPlaceholderBg || '#0B1B3D',
+          manifestoSummary: c.manifesto_summary || shared?.manifestoSummary || 'Serving pharmacy students with transparency.',
+          manifestoPillars: shared?.manifestoPillars || [
             c.manifesto_summary || 'Promote student academic excellence',
             'Enhance clinical rotation welfare and supplies',
             'Maintain transparent association financial records',
           ],
+          unopposed: shared?.unopposed ?? false,
         };
       });
     }
@@ -546,9 +550,16 @@ export function BallotView({ onNavigate }: BallotViewProps) {
 
                           {/* Top Badges Bar: Year of Study + Radio Selection Check Circle */}
                           <div className="relative z-10 flex items-center justify-between p-4">
-                            <span className="rounded-full bg-black/50 backdrop-blur-md px-3 py-1 font-mono text-[11px] font-semibold text-white/90 border border-white/15 shadow-xs">
-                              {cand.yearOfStudy.replace('Bachelor of Pharmacy', 'B.Pharm')}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="rounded-full bg-black/50 backdrop-blur-md px-3 py-1 font-mono text-[11px] font-semibold text-white/90 border border-white/15 shadow-xs">
+                                {cand.yearOfStudy.replace('Bachelor of Pharmacy', 'B.Pharm')}
+                              </span>
+                              {cand.unopposed && (
+                                <span className="rounded-full bg-amber-500/90 backdrop-blur-md px-2.5 py-1 font-mono text-[10px] font-bold text-white border border-amber-400/30 shadow-xs">
+                                  Unopposed
+                                </span>
+                              )}
+                            </div>
 
                             <div
                               className={`flex h-8 w-8 items-center justify-center rounded-full transition-all duration-200 shadow-xs ${
@@ -569,9 +580,15 @@ export function BallotView({ onNavigate }: BallotViewProps) {
                                 <h3 className="font-display text-2xl font-bold text-white tracking-tight drop-shadow-md">
                                   {cand.name}
                                 </h3>
-                                <p className="text-xs text-white/75 font-mono drop-shadow-xs mt-0.5">
-                                  Candidate ID: {cand.id.toUpperCase()}
-                                </p>
+                                {cand.unopposed ? (
+                                  <p className="text-xs text-amber-300 font-mono drop-shadow-xs mt-0.5">
+                                    Declared Elected Unopposed
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-white/75 font-mono drop-shadow-xs mt-0.5">
+                                    Candidate ID: {cand.id.toUpperCase()}
+                                  </p>
+                                )}
                               </div>
                               {isSelected && (
                                 <span className="shrink-0 rounded-full bg-primary px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-xs">

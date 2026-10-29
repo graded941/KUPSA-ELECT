@@ -132,7 +132,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
   }, [dbCandidates, effectiveOffices, candidateClearances]);
 
   // Candidate edit state
-  const [selectedCandidateId, setSelectedCandidateId] = useState<string>(SHARED_CANDIDATES[0]?.id || 'cand-01');
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string>(SHARED_CANDIDATES[0]?.id || 'cand-pres-01');
   const [candidateEditName, setCandidateEditName] = useState(SHARED_CANDIDATES[0]?.name || '');
   const [candidateEditPhotoUrl, setCandidateEditPhotoUrl] = useState(SHARED_CANDIDATES[0]?.photoUrl || '');
   const [candidateEditManifesto, setCandidateEditManifesto] = useState(SHARED_CANDIDATES[0]?.manifestoSummary || '');
@@ -1153,7 +1153,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                       type="text"
                       value={candidateEditName}
                       onChange={(e) => setCandidateEditName(e.target.value)}
-                      placeholder="e.g. Amina Muthoni"
+                      placeholder="e.g. Wambua Titus"
                       className="w-full rounded-xl border border-border bg-background py-2.5 px-3 text-xs sm:text-sm text-foreground focus:border-primary outline-none"
                     />
                   </div>

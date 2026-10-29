@@ -164,7 +164,7 @@ export const RehearsalSimulator: React.FC<RehearsalSimulatorProps> = ({ isOpen, 
                     Candidate Agent Presence & Zero-Genesis Verification
                   </div>
                   <div className="text-muted-foreground mt-0.5">
-                    Agents for Amina Muthoni and Brian Kiprop witness the virtual ballot box empty state (genesis hash: 0x00000000).
+                    Agents for Wambua Titus and Mputhia Mark Mwenda witness the virtual ballot box empty state (genesis hash: 0x00000000).
                   </div>
                 </div>
               </label>
@@ -237,13 +237,13 @@ export const RehearsalSimulator: React.FC<RehearsalSimulatorProps> = ({ isOpen, 
             {/* Mock Tallies */}
             <div className="space-y-3">
               <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground font-semibold">
-                Simulated Chairperson Portfolio Outcome:
+                Simulated President Portfolio Outcome:
               </div>
 
               <div className="space-y-2 text-xs">
                 <div>
                   <div className="flex justify-between font-semibold mb-1">
-                    <span>Amina Muthoni (Simulated)</span>
+                    <span>Wambua Titus (Simulated)</span>
                     <span className="font-mono">31 votes (62.0%)</span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
@@ -253,7 +253,7 @@ export const RehearsalSimulator: React.FC<RehearsalSimulatorProps> = ({ isOpen, 
 
                 <div>
                   <div className="flex justify-between font-semibold mb-1">
-                    <span>Brian Kiprop (Simulated)</span>
+                    <span>Mputhia Mark Mwenda (Simulated)</span>
                     <span className="font-mono">19 votes (38.0%)</span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">

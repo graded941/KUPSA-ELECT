@@ -218,9 +218,8 @@ export function OverviewView({ onNavigate, onOpenAudit, onOpenRehearsal, current
 
               <ul className="mt-5 space-y-3">
                 {[
-                  { name: 'Amina Muthoni', selected: false, initials: 'AM' },
-                  { name: 'Brian Kiprop', selected: true, initials: 'BK' },
-                  { name: 'Faith Chebet', selected: false, initials: 'FC' },
+                  { name: 'Wambua Titus', selected: false, initials: 'WT' },
+                  { name: 'Mputhia Mark Mwenda', selected: true, initials: 'MMM' },
                 ].map((c) => (
                   <li
                     key={c.name}
