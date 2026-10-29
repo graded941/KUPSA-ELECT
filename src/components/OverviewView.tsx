@@ -22,7 +22,7 @@ interface OverviewViewProps {
 }
 
 const STATUS = [
-  { label: 'Voting day', value: 'First Friday, Nov', note: 'Article 41(1)', live: false },
+  { label: 'Voting day', value: 'Friday, Nov 6', note: 'Article 41(1)', live: false },
   { label: 'Run by', value: 'Electoral Commission', note: '5 independent members', live: false },
   { label: 'Voters', value: '~1,000 students', note: 'School of Pharmacy', live: false },
 ];
@@ -67,7 +67,7 @@ const ARTICLES = [
   {
     n: 41,
     t: 'When elections happen',
-    b: 'General elections are held on the first Friday of November each academic year following statutory notice.'
+    b: 'General elections are held on Friday, the 6th of November (first Friday of November) each academic year following statutory notice.'
   },
   {
     n: 46,
@@ -125,7 +125,7 @@ export function OverviewView({ onNavigate, onOpenAudit, onOpenRehearsal, current
   return (
     <div className="space-y-0">
       {/* Dynamic Results Status Notice Banner across all devices */}
-      {isResultsLive ? (
+      {isResultsLive && (
         <div className="bg-emerald-600 text-white px-4 py-3 sm:px-6 shadow-sm border-b border-emerald-700">
           <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 text-xs sm:text-sm font-medium">
@@ -140,23 +140,6 @@ export function OverviewView({ onNavigate, onOpenAudit, onOpenRehearsal, current
             >
               <span>View Live Results</span>
               <ArrowRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-secondary/70 border-b border-border px-4 py-2 sm:px-6">
-          <div className="mx-auto max-w-6xl flex items-center justify-between gap-3 text-xs text-muted-foreground">
-            <div className="flex items-center gap-2 font-mono">
-              <Lock className="h-3 w-3 text-primary" />
-              <span>
-                <strong>Article 46 Embargo Active:</strong> Candidate tallies sealed until 17:00 EAT. Anonymous ballot hashes can be verified anytime.
-              </span>
-            </div>
-            <button
-              onClick={() => onNavigate('results')}
-              className="shrink-0 font-mono text-xs font-semibold text-primary hover:underline"
-            >
-              Check Embargo Status →
             </button>
           </div>
         </div>

@@ -1350,7 +1350,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
                       required
                       value={nominationForm.regNo}
                       onChange={(e) => setNominationForm({ ...nominationForm, regNo: e.target.value })}
-                      placeholder="PHARM/2023/...."
+                      placeholder="PHAM/M/0000/00/00"
                       className="mt-1 w-full rounded-xl border border-border bg-background px-3.5 py-2.5 font-mono text-foreground focus:border-ink focus:outline-none"
                     />
                   </div>

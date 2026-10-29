@@ -221,7 +221,7 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
                 Public Results Unseal In
               </h2>
               <p className="mt-2 text-sm text-muted-foreground font-mono">
-                Official Declaration: First Friday of November at 17:00 EAT (5:00 PM)
+                Official Declaration: Friday, 6th of November at 17:00 EAT (5:00 PM)
               </p>
             </div>
 

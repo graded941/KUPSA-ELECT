@@ -272,6 +272,17 @@ export function generateVoterAuthEmailHtml({
         Your student accreditation for the <strong>2026 KUPSA General Elections</strong> has been verified for <strong>${yearOfStudy}</strong>. Below is your official one-time access password to enter the voting portal:
       </p>
 
+      <div style="background: #f5f5f4; border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 13px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span style="color: #78716c; font-weight: 600;">Election Date:</span>
+          <span style="color: #1c1917; font-weight: 700;">Friday, 6th of November 2026</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #78716c; font-weight: 600;">Polling Window:</span>
+          <span style="color: #ea580c; font-weight: 700;">08:00 – 17:00 EAT (Article 41)</span>
+        </div>
+      </div>
+
       <div class="credential-box">
         <div class="credential-label">Your Secret Portal Password</div>
         <div class="password-code">${password}</div>

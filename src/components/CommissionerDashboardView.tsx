@@ -38,6 +38,50 @@ interface CommissionerDashboardViewProps {
 
 type TabType = 'overview' | 'results-control' | 'controls' | 'voter-roll' | 'candidates' | 'ballot-ledger' | 'gmail-broadcast';
 
+export interface ApprovedCommissioner {
+  id: number;
+  name: string;
+  designation: 'Commissioner' | 'Technical Commissioner';
+}
+
+export const APPROVED_COMMISSIONERS: ApprovedCommissioner[] = [
+  { id: 1, name: 'Sandrah Tallam', designation: 'Commissioner' },
+  { id: 2, name: 'Collins Kiptoo', designation: 'Commissioner' },
+  { id: 3, name: 'Stacy Aluoch', designation: 'Commissioner' },
+  { id: 4, name: 'Gichia Moses', designation: 'Commissioner' },
+  { id: 5, name: 'Atieno Bridget', designation: 'Commissioner' },
+  { id: 6, name: 'Erastus Gathungu', designation: 'Technical Commissioner' },
+];
+
+export function matchApprovedCommissioner(inputName: string): ApprovedCommissioner | null {
+  const cleanTokens = inputName
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .sort();
+
+  if (cleanTokens.length === 0) return null;
+
+  for (const commissioner of APPROVED_COMMISSIONERS) {
+    const commTokens = commissioner.name
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean)
+      .sort();
+
+    if (
+      cleanTokens.length === commTokens.length &&
+      cleanTokens.every((t, i) => t === commTokens[i])
+    ) {
+      return commissioner;
+    }
+  }
+  return null;
+}
+
+const REMEMBER_COMMISSIONER_KEY = 'kupsa_remember_commissioner_v1';
+
 export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardViewProps) {
   const {
     votes,
@@ -60,27 +104,91 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
     lastSyncTime,
     refreshDbState,
     resetAllBallots,
+    purgeVoters,
     dbOffices,
     dbCandidates,
   } = useVotingStore();
 
   const [isResettingBallots, setIsResettingBallots] = useState(false);
+  const [isPurgingVoters, setIsPurgingVoters] = useState(false);
   const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
 
-  // Officer Auth State
+  // Remember me option
+  const [rememberMe, setRememberMe] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(REMEMBER_COMMISSIONER_KEY) !== null;
+    } catch {
+      return false;
+    }
+  });
+
+  // Officer Auth State (not prefilled unless saved in rememberMe)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return sessionStorage.getItem('kupsa_commissioner_auth') === 'true';
   });
   const [officerName, setOfficerName] = useState<string>(() => {
-    return sessionStorage.getItem('kupsa_officer_name') || 'Dr. Ronald Kipkemoi';
+    try {
+      if (sessionStorage.getItem('kupsa_officer_name') === 'Dr. Ronald Kipkemoi') {
+        sessionStorage.removeItem('kupsa_officer_name');
+        sessionStorage.removeItem('kupsa_officer_role');
+      }
+      const saved = localStorage.getItem(REMEMBER_COMMISSIONER_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.officerName && parsed.officerName !== 'Dr. Ronald Kipkemoi') {
+          return parsed.officerName;
+        }
+      }
+    } catch {}
+    return '';
   });
   const [officerRole, setOfficerRole] = useState<string>(() => {
-    return sessionStorage.getItem('kupsa_officer_role') || 'Head Commissioner';
+    return sessionStorage.getItem('kupsa_officer_role') || 'Commissioner';
   });
-  const [loginEmail, setLoginEmail] = useState('returning.officer@kabarak.ac.ke');
+  const [loginEmail, setLoginEmail] = useState<string>(() => {
+    try {
+      if (sessionStorage.getItem('kupsa_officer_email') === 'returning.officer@kabarak.ac.ke') {
+        sessionStorage.removeItem('kupsa_officer_email');
+      }
+      const saved = localStorage.getItem(REMEMBER_COMMISSIONER_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.loginEmail && parsed.loginEmail !== 'returning.officer@kabarak.ac.ke') {
+          return parsed.loginEmail;
+        }
+      }
+    } catch {}
+    return '';
+  });
   const [passcode, setPasscode] = useState('');
   const [showPasscode, setShowPasscode] = useState(false);
-  const [authError, setAuthError] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Proactive cleanup of any legacy cached values in browser storage
+  React.useEffect(() => {
+    try {
+      if (sessionStorage.getItem('kupsa_officer_name') === 'Dr. Ronald Kipkemoi') {
+        sessionStorage.removeItem('kupsa_officer_name');
+        sessionStorage.removeItem('kupsa_officer_role');
+      }
+      const saved = localStorage.getItem(REMEMBER_COMMISSIONER_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.officerName === 'Dr. Ronald Kipkemoi') {
+          localStorage.removeItem(REMEMBER_COMMISSIONER_KEY);
+          setOfficerName('');
+          setRememberMe(false);
+        }
+      }
+    } catch {}
+    if (officerName === 'Dr. Ronald Kipkemoi') {
+      setOfficerName('');
+    }
+  }, [officerName]);
+
+  const matchedCommissioner = useMemo(() => {
+    return matchApprovedCommissioner(officerName);
+  }, [officerName]);
 
   // Active Sidebar Tab
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -162,21 +270,70 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
   // Login handler
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
+
+    // 1. Validate commissioner officer name against approved list (any word arrangement)
+    const matched = matchApprovedCommissioner(officerName);
+    if (!matched) {
+      setAuthError('Access denied: Unapproved commissioner credentials.');
+      return;
+    }
+
+    // 2. Validate official commission email
+    const cleanEmail = loginEmail.trim().toLowerCase();
+    if (cleanEmail !== 'kupsaofficials@kabarak.ac.ke') {
+      setAuthError('Access denied: Invalid official commission email.');
+      return;
+    }
+
+    // 3. Validate security key / passcode
     const cleanPass = passcode.trim();
-    if (cleanPass === 'Vervetend@kupsa2027.' || cleanPass === 'Vervetend@kupsa2027') {
-      setIsAuthenticated(true);
-      sessionStorage.setItem('kupsa_commissioner_auth', 'true');
-      sessionStorage.setItem('kupsa_officer_name', officerName);
-      sessionStorage.setItem('kupsa_officer_role', officerRole);
-      setAuthError(false);
+    const validPasscodes = ['Vervetend@kupsa2027.', 'Vervetend@kupsa2027', 'KUP-2026'];
+    if (!validPasscodes.includes(cleanPass)) {
+      setAuthError('Access denied: Invalid security key.');
+      return;
+    }
+
+    // Success: auto-assign designation based on approved list
+    const assignedRole = matched.designation;
+    setOfficerRole(assignedRole);
+    setIsAuthenticated(true);
+    sessionStorage.setItem('kupsa_commissioner_auth', 'true');
+    sessionStorage.setItem('kupsa_officer_name', officerName.trim());
+    sessionStorage.setItem('kupsa_officer_role', assignedRole);
+
+    if (rememberMe) {
+      try {
+        localStorage.setItem(
+          REMEMBER_COMMISSIONER_KEY,
+          JSON.stringify({
+            officerName: officerName.trim(),
+            loginEmail: cleanEmail,
+          })
+        );
+      } catch (err) {
+        console.error('Failed to save commissioner credentials in localStorage:', err);
+      }
     } else {
-      setAuthError(true);
+      try {
+        localStorage.removeItem(REMEMBER_COMMISSIONER_KEY);
+      } catch (err) {
+        console.error('Failed to remove commissioner credentials from localStorage:', err);
+      }
     }
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     sessionStorage.removeItem('kupsa_commissioner_auth');
+    sessionStorage.removeItem('kupsa_officer_name');
+    sessionStorage.removeItem('kupsa_officer_role');
+    if (!rememberMe) {
+      setOfficerName('');
+      setLoginEmail('');
+    }
+    setPasscode('');
+    setAuthError(null);
   };
 
   // Metrics calculation
@@ -296,30 +453,17 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
               <input
                 type="text"
                 value={officerName}
-                onChange={(e) => setOfficerName(e.target.value)}
+                onChange={(e) => {
+                  setOfficerName(e.target.value);
+                  if (authError) setAuthError(null);
+                }}
+                placeholder="Enter commissioner name"
                 required
                 className="w-full rounded-xl border border-border bg-background py-2.5 px-3.5 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
               />
             </div>
 
-            {/* Officer Role Designation */}
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Official Mandate / Designation
-              </label>
-              <select
-                value={officerRole}
-                onChange={(e) => setOfficerRole(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background py-2.5 px-3.5 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
-              >
-                <option value="Head Commissioner">Head Commissioner</option>
-                <option value="Commissioner">Commissioner</option>
-                <option value="Patron / Dean">Patron / Dean</option>
-                <option value="Observer">Observer</option>
-              </select>
-            </div>
-
-            {/* Officer Email */}
+            {/* Official Commission Email */}
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">
                 Official Commission Email
@@ -327,7 +471,11 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
               <input
                 type="email"
                 value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
+                onChange={(e) => {
+                  setLoginEmail(e.target.value);
+                  if (authError) setAuthError(null);
+                }}
+                placeholder="official.email@kabarak.ac.ke"
                 required
                 className="w-full rounded-xl border border-border bg-background py-2.5 px-3.5 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none font-mono text-xs"
               />
@@ -346,27 +494,46 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   value={passcode}
                   onChange={(e) => {
                     setPasscode(e.target.value);
-                    if (authError) setAuthError(false);
+                    if (authError) setAuthError(null);
                   }}
                   placeholder="Enter commission security key"
+                  required
                   className="w-full rounded-xl border border-border bg-background py-2.5 pl-3.5 pr-10 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none font-mono"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPasscode(!showPasscode)}
-                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground cursor-pointer"
                   aria-label="Toggle password visibility"
                 >
                   {showPasscode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              {authError && (
-                <p className="mt-1.5 text-xs text-destructive font-medium flex items-center gap-1">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  <span>Invalid commission security key. Access restricted to accredited officers.</span>
-                </p>
-              )}
             </div>
+
+            {/* Remember Me Option */}
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="remember-commissioner"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
+              />
+              <label
+                htmlFor="remember-commissioner"
+                className="text-xs text-muted-foreground hover:text-foreground cursor-pointer select-none font-medium"
+              >
+                Remember credentials on this browser
+              </label>
+            </div>
+
+            {authError && (
+              <p className="mt-1 text-xs text-destructive font-medium flex items-start gap-1.5 bg-destructive/10 border border-destructive/20 p-2.5 rounded-xl">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{authError}</span>
+              </p>
+            )}
 
             <button
               type="submit"
@@ -963,6 +1130,34 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                     <span>Purge All Ballots (Start Live Polling Clean)</span>
                   )}
                 </button>
+
+                <button
+                  type="button"
+                  disabled={isPurgingVoters || isLoadingDb}
+                  onClick={async () => {
+                    if (window.confirm('Are you sure you want to remove all test accounts from the voter roll? Only newly authenticated students will appear. This action cannot be undone.')) {
+                      setIsPurgingVoters(true);
+                      try {
+                        await purgeVoters();
+                        alert('All test accounts successfully purged from the voter roll. Roster is clean.');
+                      } catch (err: any) {
+                        alert(`Failed to purge test accounts: ${err.message || 'Server error'}`);
+                      } finally {
+                        setIsPurgingVoters(false);
+                      }
+                    }
+                  }}
+                  className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-xs font-mono text-destructive hover:bg-destructive/10 transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isPurgingVoters ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Purging Test Accounts...</span>
+                    </>
+                  ) : (
+                    <span>Purge Test Accounts from Voter Roll</span>
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -1034,7 +1229,16 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {filteredVoters.map((v) => (
+                    {filteredVoters.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-muted-foreground font-mono">
+                          {voterSearch
+                            ? 'No students found matching your search query.'
+                            : 'No test accounts in the voter roll. Registered students will appear here in real-time as they authenticate.'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredVoters.map((v) => (
                       <tr key={v.regNo} className="hover:bg-secondary/30 transition-colors">
                         <td className="p-3.5 font-mono text-foreground font-semibold">{v.regNo}</td>
                         <td className="p-3.5 font-medium text-foreground">{v.name}</td>
@@ -1079,7 +1283,8 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                           )}
                         </td>
                       </tr>
-                    ))}
+                    ))
+                  )}
                   </tbody>
                 </table>
               </div>

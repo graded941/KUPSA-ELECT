@@ -66,8 +66,8 @@ export const READINESS_GATES: ReadinessGate[] = [
       },
       {
         id: 'r3',
-        label: 'Calendar aligned with constitutional first Friday of November',
-        description: 'Scheduled for first Friday of November under Article 41(1).',
+        label: 'Calendar aligned with constitutional election date (Friday, 6th November 2026)',
+        description: 'Scheduled for Friday, 6th of November under Article 41(1).',
         verified: true,
         verifiedBy: 'Commission Secretariat',
         updatedAt: 'Verified Oct 2026'
@@ -240,9 +240,9 @@ export const CONSTITUTIONAL_ARTICLES: ConstitutionalArticle[] = [
   {
     number: 41,
     title: 'Election Timetable & Annual Cycle',
-    summary: 'The General Election shall take place on the first Friday of November every academic year unless altered by two-thirds of the Executive.',
+    summary: 'The General Election shall take place on Friday, 6th of November (first Friday of November) every academic year unless altered by two-thirds of the Executive.',
     keyRequirements: [
-      'Strict constitutional date: First Friday of November',
+      'Strict constitutional date: Friday, 6th of November 2026',
       'Any alteration requires 2/3 executive majority and Patron concurrence',
       'Polls open 08:00 EAT and close 17:00 EAT on polling day'
     ]

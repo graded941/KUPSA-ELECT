@@ -205,7 +205,7 @@ export function StudentPortalView({ onNavigate }: StudentPortalViewProps) {
                     id="reg"
                     value={regNo}
                     onChange={(e) => setRegNo(e.target.value)}
-                    placeholder="PHARM/2023/1042"
+                    placeholder="PHAM/M/0000/00/00"
                     className="flex-1 rounded-xl border-2 border-border bg-background px-4 py-3 font-mono text-base uppercase outline-none focus:border-ink"
                     required
                   />
@@ -522,7 +522,7 @@ export function StudentPortalView({ onNavigate }: StudentPortalViewProps) {
             <div className="sticky bottom-20 lg:bottom-6 rounded-2xl border-2 border-ink bg-card p-4 sm:p-6 shadow-pop flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <CheckCircle2 className="h-4 w-4 text-success" />
-                <span>All 6 executive offices have a candidate selected</span>
+                <span>All 7 constitutional executive offices have a candidate selected</span>
               </div>
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <button

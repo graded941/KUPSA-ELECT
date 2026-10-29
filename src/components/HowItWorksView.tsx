@@ -71,9 +71,9 @@ export const HowItWorksView: React.FC<HowItWorksViewProps> = ({ onNavigate }) =>
       num: 3,
       title: 'Voting Window Opens',
       shortTitle: '3. Voting',
-      timing: 'Polling Day: 08:00 – 17:00 EAT',
+      timing: 'Friday, 6th Nov: 08:00 – 17:00 EAT',
       article: 'Articles 41 & 45',
-      summary: 'On the first Friday of November, authorized eligible students access the blinded digital ballot. Upon casting, a zero-knowledge token marks the student as having voted, while the ballot drops anonymously into an unlinked encrypted tally box.',
+      summary: 'On Friday, the 6th of November, authorized eligible students access the blinded digital ballot. Upon casting, a zero-knowledge token marks the student as having voted, while the ballot drops anonymously into an unlinked encrypted tally box.',
       allowed: [
         'Present vetted candidates grouped clearly by constitutional office',
         'Issue a neutral cryptographic cast receipt to the voter',

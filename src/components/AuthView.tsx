@@ -299,7 +299,8 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                     </span>
                   </div>
                   <p className="text-xs text-emerald-800 dark:text-emerald-200 leading-relaxed">
-                    Your single-token voter password, PDF passcard, and polling calendar reminder have been sent to{' '}
+                    Your single-token voter password, PDF passcard, and election calendar invite for{' '}
+                    <strong>Friday, 6th November 2026 (08:00 – 17:00 EAT)</strong> have been sent to{' '}
                     <strong className="font-mono underline">{registeredEmail}</strong> for accredited student{' '}
                     <strong className="font-mono bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-950 dark:text-emerald-100">{registeredRegNo}</strong>.
                   </p>
@@ -317,7 +318,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                     <span>Dispatching credentials to your inbox...</span>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Connecting to institutional mail server (<span className="font-mono">verve.n.co.ke@gmail.com</span>) to transmit your sealed voter passcard for <span className="font-mono font-bold">{registeredRegNo}</span>.
+                    Connecting to institutional mail server (<span className="font-mono">verve.n.co.ke@gmail.com</span>) to transmit your sealed voter passcard for Election Day (<strong className="text-foreground">Friday, 6th Nov 2026</strong>).
                   </p>
                 </div>
               ) : (
@@ -327,16 +328,21 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                     <span>Sealed Password Delivery</span>
                   </div>
                   <p className="text-[11px] leading-relaxed">
-                    Under constitutional Article 39 rules, voter credentials are exclusively transmitted to your registered student address (<span className="font-mono font-medium text-foreground">{registeredEmail}</span>) for accredited registration number <span className="font-mono font-semibold text-foreground">{registeredRegNo}</span>.
+                    Under constitutional Article 39 rules, voter credentials are exclusively transmitted to your registered student address (<span className="font-mono font-medium text-foreground">{registeredEmail}</span>) for accredited registration number <span className="font-mono font-semibold text-foreground">{registeredRegNo}</span> ahead of polling on <strong className="text-foreground">Friday, 6th of November 2026</strong>.
                   </p>
                 </div>
               )}
 
               {/* 3-Step Verification Checklist */}
               <div className="rounded-2xl border border-border bg-card p-5 space-y-3.5 shadow-xs">
-                <h4 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Next Steps to Access Your Ballot
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Next Steps to Access Your Ballot
+                  </h4>
+                  <span className="font-mono text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                    Poll Date: Fri, 6 Nov 2026
+                  </span>
+                </div>
                 <ol className="space-y-3 text-xs">
                   <li className="flex items-start gap-3">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink text-sun text-[10px] font-mono font-bold">1</span>
@@ -347,7 +353,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                   <li className="flex items-start gap-3">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink text-sun text-[10px] font-mono font-bold">2</span>
                     <span className="text-foreground/90 leading-tight">
-                      Locate the email from <strong className="text-foreground">KUPSA Electoral Commission</strong> (subject: <em>Official KUPSA Voter Passcard</em>).
+                      Locate the email from <strong className="text-foreground">KUPSA Electoral Commission</strong> (subject: <em>Official KUPSA Voter Passcard · Election Date: 6th Nov 2026</em>).
                     </span>
                   </li>
                   <li className="flex items-start gap-3">

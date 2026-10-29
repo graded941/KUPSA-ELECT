@@ -865,7 +865,7 @@ app.post('/api/election/seed', async (req: Request, res: Response) => {
 
     // 5. Audit Log
     await supabaseAdmin.from('audit_logs').insert({
-      officer_email: 'returning.officer@kabarak.ac.ke',
+      officer_email: 'kupsaofficials@kabarak.ac.ke',
       officer_role: 'Head Commissioner',
       action_type: 'DATABASE_SEEDED',
       details: {
@@ -1499,6 +1499,42 @@ app.post('/api/election/reset-votes', async (req: Request, res: Response) => {
   }
 });
 
+// Purge all test voter accounts from voter roll
+app.post('/api/admin/purge-voters', async (_req: Request, res: Response) => {
+  try {
+    inMemoryVoters = [];
+    voterPinStore.clear();
+
+    if (supabaseAdmin) {
+      const { error: delErr } = await supabaseAdmin.from('voters').delete().not('id', 'is', null);
+      if (delErr) {
+        console.error('Error deleting voters in Supabase:', delErr);
+        throw delErr;
+      }
+
+      // Purge auth users
+      try {
+        const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+        if (authUsers?.users) {
+          for (const u of authUsers.users) {
+            await supabaseAdmin.auth.admin.deleteUser(u.id);
+          }
+        }
+      } catch (authErr) {
+        console.warn('Auth user purge notice:', authErr);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: 'All test accounts successfully purged from the official voter roll.',
+    });
+  } catch (err: any) {
+    console.error('Purge voters error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to purge voters' });
+  }
+});
+
 // ==========================================
 // ARTICLE 51 CONSTITUTIONAL PETITIONS & APPEALS
 // ==========================================
@@ -1537,7 +1573,7 @@ const constitutionalPetitionsStore: StoredPetition[] = [
     createdAtIso: new Date(Date.now() - 3600000 * 6).toISOString(),
     complainantName: 'Aspirant Agent Daniel Koech',
     complainantRole: 'Official Candidate Agent',
-    regNo: 'PHARM/2023/1042',
+    regNo: 'PHAM/M/1042/09/24',
     email: 'd.koech@kabarak.ac.ke',
     officeContested: 'Vice-President',
     constitutionalGrounds: 'Article 44(3) — Inquiry regarding digital campaign material distribution during moratorium window before polls opened.',

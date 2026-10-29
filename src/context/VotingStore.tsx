@@ -37,6 +37,7 @@ export interface SimulatedEmail {
   subject: string;
   password: string;
   sentAt: string;
+  electionDate?: string;
 }
 
 export interface CastVote {
@@ -115,6 +116,7 @@ interface VotingStoreContextType {
   accreditationList: StudentAccreditationRecord[];
   toggleAccreditation: (regNo: string) => void;
   resetUserVoteStatus: (email: string) => void;
+  purgeVoters: () => Promise<{ success: boolean; message?: string; error?: string }>;
 
   // Auth actions
   signUp: (name: string, email: string, yearOfStudy: string, regNo?: string) => Promise<{ success: boolean; error?: string; password?: string; user?: VoterUser }>;
@@ -608,9 +610,10 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
         id: `email-${Date.now()}`,
         recipientEmail: cleanEmail,
         recipientName: cleanName,
-        subject: 'Your Official KUPSA Election Portal Password',
+        subject: 'Your Official KUPSA Election Portal Password · Election Date: 6th Nov 2026',
         password: serverPin,
         sentAt: 'Just now',
+        electionDate: 'Friday, 6th November 2026 (08:00 – 17:00 EAT)',
       };
 
       setUsers((prev) => [newUser, ...prev.filter((u) => u.email.toLowerCase() !== cleanEmail)]);
@@ -808,9 +811,10 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
         id: `email-${Date.now()}`,
         recipientEmail: clean,
         recipientName: users.find((u) => u.email.toLowerCase() === clean)?.name || 'Pharmacy Student',
-        subject: 'Your Official KUPSA Election Portal Password (Resent)',
+        subject: 'Your Official KUPSA Election Portal Password (Resent) · Election Date: 6th Nov 2026',
         password: activePin,
         sentAt: 'Just now',
+        electionDate: 'Friday, 6th November 2026 (08:00 – 17:00 EAT)',
       };
 
       setSimulatedEmails((prev) => [updatedEmail, ...prev.filter((e) => e.recipientEmail !== clean)]);
@@ -824,14 +828,40 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
           id: `email-${Date.now()}`,
           recipientEmail: user.email,
           recipientName: user.name,
-          subject: 'Your Official KUPSA Election Portal Password (Resent)',
+          subject: 'Your Official KUPSA Election Portal Password (Resent) · Election Date: 6th Nov 2026',
           password: user.password,
           sentAt: 'Just now',
+          electionDate: 'Friday, 6th November 2026 (08:00 – 17:00 EAT)',
         };
         setSimulatedEmails((prev) => [updatedEmail, ...prev.filter((e) => e.recipientEmail !== user.email)]);
         return { success: true, message: 'PIN resent.' };
       }
       return { success: false, error: err.message || 'Failed to resend PIN.' };
+    }
+  };
+
+  const purgeVoters = async (): Promise<{ success: boolean; message?: string; error?: string }> => {
+    try {
+      const res = await fetch('/api/admin/purge-voters', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to purge voters');
+
+      setUsers([]);
+      setAccreditationList([]);
+      setCurrentUser(null);
+      setSimulatedEmails([]);
+      localStorage.removeItem(USERS_STORAGE_KEY);
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem(EMAILS_STORAGE_KEY);
+      await refreshDbState();
+      return { success: true, message: data.message };
+    } catch (err: any) {
+      console.error('Error in purgeVoters:', err);
+      setUsers([]);
+      setAccreditationList([]);
+      localStorage.removeItem(USERS_STORAGE_KEY);
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      return { success: false, error: err.message };
     }
   };
 
@@ -868,6 +898,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
         accreditationList,
         toggleAccreditation,
         resetUserVoteStatus,
+        purgeVoters,
         signUp,
         login,
         logout,

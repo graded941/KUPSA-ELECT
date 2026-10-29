@@ -142,7 +142,7 @@ export function HelpView({ onNavigate }: HelpViewProps) {
                   <input
                     required
                     className={`${inputClass} font-mono uppercase`}
-                    placeholder="Student registration number (e.g. PHARM/2023/...)"
+                    placeholder="Student registration number (e.g. PHAM/M/0000/00/00)"
                   />
                   <input required type="email" className={inputClass} placeholder="Student email address" />
                   <textarea

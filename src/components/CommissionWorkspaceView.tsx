@@ -312,41 +312,6 @@ export function CommissionWorkspaceView({
               </button>
             </form>
 
-            {/* Quick Demo Access Buttons */}
-            <div className="mt-6 pt-5 border-t border-border">
-              <p className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground mb-2 text-center">
-                Demo Testing Shortcuts
-              </p>
-              <div className="grid grid-cols-1 gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleQuickDemoLogin(
-                      OFFICER_ROLES[0],
-                      'EC-KUPSA-CHAIR-01'
-                    )
-                  }
-                  className="rounded-xl border border-border bg-secondary/50 px-3 py-2 text-xs font-medium text-foreground hover:bg-accent hover:border-ink transition-colors text-left flex items-center justify-between"
-                >
-                  <span>Chief Returning Officer Demo</span>
-                  <span className="text-[10px] font-mono text-primary font-bold">1-Click Login →</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleQuickDemoLogin(
-                      OFFICER_ROLES[2],
-                      'EC-KUPSA-ICT-03'
-                    )
-                  }
-                  className="rounded-xl border border-border bg-secondary/50 px-3 py-2 text-xs font-medium text-foreground hover:bg-accent hover:border-ink transition-colors text-left flex items-center justify-between"
-                >
-                  <span>ICT & Verification Desk Demo</span>
-                  <span className="text-[10px] font-mono text-primary font-bold">1-Click Login →</span>
-                </button>
-              </div>
-            </div>
-
             {/* Exit to Public Portal */}
             <div className="mt-5 text-center">
               <button
