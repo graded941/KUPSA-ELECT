@@ -21,6 +21,7 @@ import {
   IdCard
 } from 'lucide-react';
 import { dispatchVoterPassEmail } from '../lib/electionService';
+import { isValidPharmacyRegNo, getExpectedYearOfStudy } from '../lib/utils';
 
 interface AuthViewProps {
   onNavigate: (view: ViewId) => void;
@@ -79,12 +80,15 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
     return email.trim().toLowerCase().endsWith('@kabarak.ac.ke');
   };
 
-  // Registration Number format validator: PHAM/M/0000/00/00 | PHAM/MK/0000/00/00 | PHAM/MG/0000/00/00
-  const KUPSA_REG_NO_REGEX = /^PHAM\/(M|MK|MG)\/\d{4}\/\d{2}\/\d{2}$/i;
-
   const isRegNoValid = (reg: string) => {
-    return KUPSA_REG_NO_REGEX.test(reg.trim());
+    return isValidPharmacyRegNo(reg);
   };
+
+  const expectedCohortYear = isRegNoValid(regNo) ? getExpectedYearOfStudy(regNo) : null;
+  const cohortMismatchError =
+    expectedCohortYear && yearOfStudy !== expectedCohortYear
+      ? `Year of study must align with your registration number cohort (${expectedCohortYear})`
+      : null;
 
   const emailError =
     emailTouched && signupEmail.trim().length > 0 && !isEmailValidKabarak(signupEmail)
@@ -93,7 +97,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
 
   const regNoError =
     regNoTouched && regNo.trim().length > 0 && !isRegNoValid(regNo)
-      ? 'Format must be either PHAM/M/0000/00/00, PHAM/MK/0000/00/00, or PHAM/MG/0000/00/00'
+      ? 'Please enter a valid student registration number'
       : null;
 
   // Handle Sign Up
@@ -109,12 +113,20 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
     }
 
     if (!regNo.trim()) {
-      setSignupError('Please enter your official student registration number (e.g. PHAM/M/0000/00/00)');
+      setSignupError('Please enter your official student registration number');
       return;
     }
 
     if (!isRegNoValid(regNo)) {
-      setSignupError('Registration number must match format: either PHAM/M/0000/00/00, PHAM/MK/0000/00/00, or PHAM/MG/0000/00/00');
+      setSignupError('Please enter a valid student registration number');
+      return;
+    }
+
+    const expectedYear = getExpectedYearOfStudy(regNo);
+    if (!expectedYear || yearOfStudy !== expectedYear) {
+      setSignupError(
+        `Year of study mismatch: Registration number corresponds to ${expectedYear || 'a different cohort'}. Please select ${expectedYear} to create an account.`
+      );
       return;
     }
 
@@ -493,12 +505,9 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
 
                   {/* Student Registration Number */}
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-semibold text-foreground">
-                        Student Registration Number
-                      </label>
-                      <span className="text-[10px] font-mono text-muted-foreground">Format: PHAM/M/0000/00/00</span>
-                    </div>
+                    <label className="block text-xs font-semibold text-foreground mb-1">
+                      Student Registration Number
+                    </label>
                     <div className="relative">
                       <IdCard className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
                       <input
@@ -507,10 +516,15 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                         value={regNo}
                         onBlur={() => setRegNoTouched(true)}
                         onChange={(e) => {
-                          setRegNo(e.target.value.toUpperCase());
+                          const val = e.target.value.toUpperCase();
+                          setRegNo(val);
                           if (signupError) setSignupError(null);
+                          const derivedCohort = getExpectedYearOfStudy(val);
+                          if (derivedCohort) {
+                            setYearOfStudy(derivedCohort);
+                          }
                         }}
-                        placeholder="e.g. PHAM/M/0000/00/00"
+                        placeholder="Enter registration number"
                         className={`w-full rounded-xl border py-2.5 pl-10 pr-3 text-sm font-mono uppercase text-foreground placeholder:text-muted-foreground outline-none transition-all ${
                           regNoError
                             ? 'border-destructive bg-destructive/5 focus:border-destructive'
@@ -558,15 +572,29 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
 
                   {/* Year of Study */}
                   <div>
-                    <label className="block text-xs font-semibold text-foreground mb-1">
-                      Year of Study
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-foreground">
+                        Year of Study
+                      </label>
+                      {expectedCohortYear && (
+                        <span className="text-[10px] font-mono text-primary font-semibold bg-primary/10 px-2 py-0.5 rounded-full">
+                          Aligned to {expectedCohortYear}
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
                       <GraduationCap className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
                       <select
                         value={yearOfStudy}
-                        onChange={(e) => setYearOfStudy(e.target.value)}
-                        className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                        onChange={(e) => {
+                          setYearOfStudy(e.target.value);
+                          if (signupError) setSignupError(null);
+                        }}
+                        className={`w-full rounded-xl border py-2.5 pl-10 pr-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                          cohortMismatchError
+                            ? 'border-destructive bg-destructive/5'
+                            : 'border-border bg-background'
+                        }`}
                       >
                         <option value="Year 1">Year 1 (Freshman)</option>
                         <option value="Year 2">Year 2 (Sophomore)</option>
@@ -576,6 +604,11 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                         <option value="Masters">Masters (Postgraduate)</option>
                       </select>
                     </div>
+                    {cohortMismatchError && (
+                      <p role="alert" aria-live="polite" className="mt-1 text-xs font-medium text-destructive">
+                        {cohortMismatchError}
+                      </p>
+                    )}
                   </div>
 
                   <button
@@ -668,20 +701,20 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                           setLoginPassword(e.target.value);
                           if (loginError) setLoginError(null);
                         }}
-                        placeholder="e.g. KUP-892415"
+                        placeholder=""
                         className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-10 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        className="absolute right-3 top-2.5 p-1 text-muted-foreground hover:text-foreground"
+                        className="absolute right-3 top-2.5 p-1 text-muted-foreground hover:text-foreground cursor-pointer"
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
                     <p className="mt-1 text-[11px] text-muted-foreground">
-                      Passwords are sent to your Kabarak email. Check spam if you don't see it.
+                      Password has been sent to your Kabarak email. Check spam if you don't see it.
                     </p>
                   </div>
 

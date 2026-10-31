@@ -1,3 +1,5 @@
+import { getCandidatePhotoUrl } from './candidateImages.js';
+
 export interface SharedCandidate {
   id: string;
   name: string;
@@ -86,7 +88,7 @@ export const SHARED_OFFICES: SharedOffice[] = [
 ];
 
 // Official list of certified candidates across the 7 constitutional portfolios (without admission numbers)
-export const SHARED_CANDIDATES: SharedCandidate[] = [
+const BASE_CANDIDATES: SharedCandidate[] = [
   // 1. PRESIDENT
   {
     id: 'cand-pres-01',
@@ -453,6 +455,11 @@ export const SHARED_CANDIDATES: SharedCandidate[] = [
     ]
   }
 ];
+
+export const SHARED_CANDIDATES: SharedCandidate[] = BASE_CANDIDATES.map((c) => ({
+  ...c,
+  photoUrl: c.photoUrl || getCandidatePhotoUrl(c.id),
+}));
 
 // Helper to get candidates for an office strictly sorted alphabetically by name
 export function getCandidatesForOffice(officeId: string): SharedCandidate[] {

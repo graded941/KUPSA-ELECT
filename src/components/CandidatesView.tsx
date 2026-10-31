@@ -95,23 +95,23 @@ function CandidateDefaultCard({
       <div className="relative z-10 mt-8">
         <div className="flex items-center gap-3.5 mb-3">
           <div className="relative h-14 w-14 overflow-hidden rounded-full ring-2 ring-black/15 ring-offset-2 ring-offset-[#ece9e1] shrink-0 shadow-xs">
+            <span
+              className="absolute inset-0 z-0 flex items-center justify-center font-display text-lg font-bold text-white shadow-xs"
+              style={{ backgroundColor: cand.photoPlaceholderBg || '#286746' }}
+            >
+              {cand.initials}
+            </span>
             {cand.photoUrl ? (
               <img
                 src={cand.photoUrl}
                 alt={cand.name}
-                className="h-full w-full object-cover"
+                className="absolute inset-0 z-10 h-full w-full object-cover"
                 loading="lazy"
                 onError={(e) => {
                   (e.currentTarget as HTMLElement).style.display = 'none';
                 }}
               />
             ) : null}
-            <span
-              className="absolute inset-0 flex items-center justify-center font-display text-lg font-bold text-white shadow-xs"
-              style={{ backgroundColor: cand.photoPlaceholderBg || '#286746' }}
-            >
-              {cand.initials}
-            </span>
           </div>
 
           <div>
@@ -196,6 +196,7 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
         name: clearance?.name || dbMatch?.name || baseCand.name,
         photoUrl: clearance?.photoUrl || dbMatch?.photo_url || baseCand.photoUrl,
         manifestoSummary: clearance?.manifestoSummary || dbMatch?.manifesto_summary || baseCand.manifestoSummary,
+        manifestoPillars: clearance?.manifestoPillars || baseCand.manifestoPillars,
         vettingStatus,
       };
     });
@@ -871,20 +872,23 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
             <div className="p-6 border-b border-border bg-card">
               <div className="flex items-start gap-4">
                 <div className="relative shrink-0">
-                  <div className="h-20 w-20 overflow-hidden rounded-full ring-2 ring-primary ring-offset-2 ring-offset-card shadow-md">
-                    {pickedCandidate.photoUrl ? (
-                      <img
-                        src={pickedCandidate.photoUrl}
-                        alt={pickedCandidate.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : null}
+                  <div className="relative h-20 w-20 overflow-hidden rounded-full ring-2 ring-primary ring-offset-2 ring-offset-card shadow-md">
                     <span
-                      className="absolute inset-0 flex items-center justify-center font-display text-2xl font-bold text-white"
+                      className="absolute inset-0 z-0 flex items-center justify-center font-display text-2xl font-bold text-white"
                       style={{ backgroundColor: pickedCandidate.photoPlaceholderBg || '#286746' }}
                     >
                       {pickedCandidate.initials}
                     </span>
+                    {pickedCandidate.photoUrl ? (
+                      <img
+                        src={pickedCandidate.photoUrl}
+                        alt={pickedCandidate.name}
+                        className="absolute inset-0 z-10 h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    ) : null}
                   </div>
                 </div>
 
@@ -1190,15 +1194,22 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
                         {/* Header Info */}
                         <div className="text-center">
                           <div className="mx-auto h-20 w-20 overflow-hidden rounded-full ring-2 ring-primary ring-offset-2 ring-offset-background shadow-xs relative">
-                            {c.photoUrl ? (
-                              <img src={c.photoUrl} alt={c.name} className="h-full w-full object-cover" />
-                            ) : null}
                             <span
-                              className="absolute inset-0 flex items-center justify-center font-display text-2xl font-bold text-white"
+                              className="absolute inset-0 z-0 flex items-center justify-center font-display text-2xl font-bold text-white"
                               style={{ backgroundColor: c.photoPlaceholderBg || '#286746' }}
                             >
                               {c.initials}
                             </span>
+                            {c.photoUrl ? (
+                              <img
+                                src={c.photoUrl}
+                                alt={c.name}
+                                className="absolute inset-0 z-10 h-full w-full object-cover"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLElement).style.display = 'none';
+                                }}
+                              />
+                            ) : null}
                           </div>
 
                           <h4 className="mt-3 font-display text-lg font-bold text-foreground">

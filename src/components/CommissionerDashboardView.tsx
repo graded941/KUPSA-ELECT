@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ViewId } from '../types';
 import { useVotingStore } from '../context/VotingStore';
 import { SHARED_OFFICES, SHARED_CANDIDATES } from '../data/candidateData';
+import { getCandidatePhotoUrl } from '../data/candidateImages';
 import {
   LayoutDashboard,
   BarChart3,
@@ -218,7 +219,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
           name: c.name,
           officeId: c.office_id,
           officeTitle: off ? off.title : 'Executive Seat',
-          photoUrl: c.photo_url || '',
+          photoUrl: c.photo_url || getCandidatePhotoUrl(c.id),
           manifestoSummary: c.manifesto_summary || '',
           yearOfStudy: c.year_of_study || 'Year 3',
           clearanceStatus: clearanceRec?.status || c.clearance_status || 'Cleared & Certified',
@@ -244,6 +245,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
   const [candidateEditName, setCandidateEditName] = useState(SHARED_CANDIDATES[0]?.name || '');
   const [candidateEditPhotoUrl, setCandidateEditPhotoUrl] = useState(SHARED_CANDIDATES[0]?.photoUrl || '');
   const [candidateEditManifesto, setCandidateEditManifesto] = useState(SHARED_CANDIDATES[0]?.manifestoSummary || '');
+  const [candidateEditPillars, setCandidateEditPillars] = useState(SHARED_CANDIDATES[0]?.manifestoPillars?.join('\n') || '');
   const [candidateEditStatus, setCandidateEditStatus] = useState<'Cleared & Certified' | 'Under Review' | 'Provisional'>('Cleared & Certified');
   const [candidateEditNotes, setCandidateEditNotes] = useState('');
   const [candidateSavedAlert, setCandidateSavedAlert] = useState(false);
@@ -253,11 +255,22 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
     setSelectedCandidateId(candId);
     const rec = candidateClearances[candId];
     const cand = candidateList.find((c) => c.id === candId);
+    const baseCand = SHARED_CANDIDATES.find((c) => c.id === candId);
+
     if (cand) {
       setCandidateEditName(cand.name);
       setCandidateEditPhotoUrl(cand.photoUrl || '');
       setCandidateEditManifesto(cand.manifestoSummary || '');
     }
+
+    if (rec?.manifestoPillars && rec.manifestoPillars.length > 0) {
+      setCandidateEditPillars(rec.manifestoPillars.join('\n'));
+    } else if (baseCand?.manifestoPillars) {
+      setCandidateEditPillars(baseCand.manifestoPillars.join('\n'));
+    } else {
+      setCandidateEditPillars('');
+    }
+
     if (rec) {
       setCandidateEditStatus(rec.status);
       setCandidateEditNotes(rec.notes);
@@ -410,10 +423,16 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
   // Save candidate clearance and profile update
   const handleSaveCandidateClearance = (e: React.FormEvent) => {
     e.preventDefault();
+    const parsedPillars = candidateEditPillars
+      .split('\n')
+      .map((p) => p.trim().replace(/^[-*•0-9.]+\s*/, ''))
+      .filter(Boolean);
+
     updateCandidateClearance(selectedCandidateId, candidateEditStatus, candidateEditNotes, {
       name: candidateEditName,
       photoUrl: candidateEditPhotoUrl,
       manifestoSummary: candidateEditManifesto,
+      manifestoPillars: parsedPillars.length > 0 ? parsedPillars : undefined,
     });
     setCandidateSavedAlert(true);
     setTimeout(() => setCandidateSavedAlert(false), 2500);
@@ -1363,19 +1382,42 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                     />
                   </div>
 
-                  {/* Photo URL with Thumbnail */}
+                  {/* Photo Path / URL with File Browse & Thumbnail */}
                   <div>
                     <label className="block text-xs font-semibold text-foreground mb-1">
-                      Official Portrait Image URL
+                      Official Portrait Path or URL
                     </label>
                     <div className="flex items-center gap-2">
                       <input
-                        type="url"
+                        type="text"
                         value={candidateEditPhotoUrl}
                         onChange={(e) => setCandidateEditPhotoUrl(e.target.value)}
-                        placeholder="https://... photo link"
+                        placeholder="/candidates/cand-pres-01.jpg or URL"
                         className="flex-1 rounded-xl border border-border bg-background py-2.5 px-3 text-xs sm:text-sm text-foreground focus:border-primary outline-none font-mono"
                       />
+                      <label
+                        className="rounded-xl border border-border bg-secondary hover:bg-muted py-2 px-3 text-xs font-semibold text-foreground cursor-pointer shrink-0 transition-colors"
+                        title="Browse local photo file"
+                      >
+                        Browse
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (ev) => {
+                                if (typeof ev.target?.result === 'string') {
+                                  setCandidateEditPhotoUrl(ev.target.result);
+                                }
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
                       {candidateEditPhotoUrl && (
                         <div className="h-9 w-9 rounded-lg overflow-hidden border border-border shrink-0 bg-secondary">
                           <img
@@ -1389,6 +1431,9 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                         </div>
                       )}
                     </div>
+                    <span className="text-[10px] text-muted-foreground mt-1 block">
+                      Use repository path (e.g. <code className="font-mono">/candidates/cand-pres-01.jpg</code>), external URL, or browse local file
+                    </span>
                   </div>
                 </div>
 
@@ -1404,6 +1449,23 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                     placeholder="Short summary of candidate policy priorities and platform..."
                     className="w-full rounded-xl border border-border bg-background p-3 text-xs text-foreground focus:border-primary outline-none"
                   />
+                </div>
+
+                {/* Core Policy Pillars */}
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    Core Policy Pillars / Priority Promises (One per line)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={candidateEditPillars}
+                    onChange={(e) => setCandidateEditPillars(e.target.value)}
+                    placeholder="Enter each policy pledge on a new line (e.g. Expand clinical rotation sponsorship)..."
+                    className="w-full rounded-xl border border-border bg-background p-3 text-xs text-foreground focus:border-primary outline-none"
+                  />
+                  <span className="text-[10px] text-muted-foreground mt-0.5 block">
+                    Displayed as numbered promises in candidate comparison and dossier views.
+                  </span>
                 </div>
 
                 {/* Commission Notes */}
@@ -1457,19 +1519,20 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="h-11 w-11 rounded-full overflow-hidden bg-secondary border border-border shrink-0 flex items-center justify-center font-bold text-xs">
+                        <div className="relative h-11 w-11 rounded-full overflow-hidden bg-[#286746] text-white border border-border shrink-0 flex items-center justify-center font-bold text-xs">
+                          <span className="absolute inset-0 z-0 flex items-center justify-center">
+                            {cand.name.split(' ').map((w) => w[0]).join('').substring(0, 2).toUpperCase()}
+                          </span>
                           {cand.photoUrl ? (
                             <img
                               src={cand.photoUrl}
                               alt={cand.name}
-                              className="h-full w-full object-cover"
+                              className="absolute inset-0 z-10 h-full w-full object-cover"
                               onError={(e) => {
                                 (e.currentTarget as HTMLElement).style.display = 'none';
                               }}
                             />
-                          ) : (
-                            cand.name.substring(0, 2).toUpperCase()
-                          )}
+                          ) : null}
                         </div>
                         <div>
                           <h4 className="font-display font-bold text-foreground text-sm">{cand.name}</h4>

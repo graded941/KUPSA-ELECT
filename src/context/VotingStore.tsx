@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { SHARED_OFFICES, SHARED_CANDIDATES } from '../data/candidateData';
+import { isValidPharmacyRegNo, getExpectedYearOfStudy } from '../lib/utils';
 import {
   fetchLiveElectionState,
   castSecretBallotApi,
@@ -56,6 +57,7 @@ export interface CandidateClearanceRecord {
   name?: string;
   photoUrl?: string;
   manifestoSummary?: string;
+  manifestoPillars?: string[];
 }
 
 export interface StudentAccreditationRecord {
@@ -109,6 +111,7 @@ interface VotingStoreContextType {
       name?: string;
       photoUrl?: string;
       manifestoSummary?: string;
+      manifestoPillars?: string[];
     }
   ) => void;
 
@@ -478,6 +481,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
       name?: string;
       photoUrl?: string;
       manifestoSummary?: string;
+      manifestoPillars?: string[];
     }
   ) => {
     setCandidateClearances((prev) => ({
@@ -489,6 +493,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
         ...(extra?.name ? { name: extra.name } : {}),
         ...(extra?.photoUrl ? { photoUrl: extra.photoUrl } : {}),
         ...(extra?.manifestoSummary ? { manifestoSummary: extra.manifestoSummary } : {}),
+        ...(extra?.manifestoPillars ? { manifestoPillars: extra.manifestoPillars } : {}),
       },
     }));
 
@@ -569,11 +574,18 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return { success: false, error: 'Full name is required' };
     }
 
-    const KUPSA_REG_NO_REGEX = /^PHAM\/(M|MK|MG)\/\d{4}\/\d{2}\/\d{2}$/i;
-    if (!cleanRegNo || !KUPSA_REG_NO_REGEX.test(cleanRegNo)) {
+    if (!cleanRegNo || !isValidPharmacyRegNo(cleanRegNo)) {
       return {
         success: false,
-        error: 'Registration number must match official format: either PHAM/M/0000/00/00, PHAM/MK/0000/00/00, or PHAM/MG/0000/00/00',
+        error: 'Invalid student registration number format.',
+      };
+    }
+
+    const expectedYear = getExpectedYearOfStudy(cleanRegNo);
+    if (!expectedYear || yearOfStudy !== expectedYear) {
+      return {
+        success: false,
+        error: `Year of study mismatch: Registration number corresponds to ${expectedYear || 'a different cohort'}. Account cannot be created.`,
       };
     }
 

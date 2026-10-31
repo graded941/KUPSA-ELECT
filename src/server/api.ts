@@ -5,6 +5,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 import { NotificationOutbox } from './notification-outbox.js';
 import { verifySmtpConnection, resolveSmtpCredentials } from './email.server.js';
+import { CANDIDATE_IMAGE_MAP } from '../data/candidateImages.js';
 
 dotenv.config({ override: true });
 if (process.env.VITE_SUPABASE_URL) {
@@ -421,7 +422,10 @@ let inMemorySettings: ElectionSettingsState = {
 };
 
 let inMemoryOffices = [...INITIAL_OFFICES];
-let inMemoryCandidates = [...INITIAL_CANDIDATES];
+let inMemoryCandidates = INITIAL_CANDIDATES.map((c) => ({
+  ...c,
+  photo_url: c.photo_url || CANDIDATE_IMAGE_MAP[c.id] || '',
+}));
 let inMemoryVoters: any[] = [];
 let inMemoryBallots: any[] = [];
 let inMemoryAuditLogs: any[] = [];
@@ -513,7 +517,12 @@ app.get('/api/election/state', async (_req: Request, res: Response) => {
 
       if (settingsRes.data) inMemorySettings = { ...inMemorySettings, ...settingsRes.data };
       if (officesRes.data && officesRes.data.length > 0) inMemoryOffices = officesRes.data;
-      if (candsRes.data && candsRes.data.length > 0) inMemoryCandidates = candsRes.data;
+      if (candsRes.data && candsRes.data.length > 0) {
+        inMemoryCandidates = candsRes.data.map((c: any) => ({
+          ...c,
+          photo_url: c.photo_url || CANDIDATE_IMAGE_MAP[c.id] || '',
+        }));
+      }
       if (votersRes.data && votersRes.data.length > 0) inMemoryVoters = votersRes.data;
       if (ballotsRes.data) inMemoryBallots = ballotsRes.data;
     } catch (err: any) {
@@ -530,17 +539,48 @@ app.get('/api/election/state', async (_req: Request, res: Response) => {
   });
 });
 
+// Helper: Registration Number format validator and cohort year aligner
+const KUPSA_REG_NO_REGEX = /^PHAR?M\/(M|MK|MG|MS)\/\d{4}\/(0[1-9]|1[0-2]|\d{2})\/(\d{2}|\d{4})$/i;
+
+function getExpectedYearOfStudy(regNo: string): string | null {
+  const match = regNo.trim().match(KUPSA_REG_NO_REGEX);
+  if (!match) return null;
+
+  const prefix = match[1].toUpperCase();
+  if (prefix === 'MS') {
+    return 'Masters';
+  }
+
+  const rawYear = match[3];
+  const admissionYear = rawYear.length === 4 ? parseInt(rawYear, 10) : 2000 + parseInt(rawYear, 10);
+
+  switch (admissionYear) {
+    case 2026:
+      return 'Year 1';
+    case 2025:
+      return 'Year 2';
+    case 2024:
+      return 'Year 3';
+    case 2023:
+      return 'Year 4';
+    case 2022:
+      return 'Year 5';
+    default:
+      if (admissionYear < 2022) return 'Year 5';
+      if (admissionYear > 2026) return 'Year 1';
+      return null;
+  }
+}
+
 // Helper: Compute realistic Kabarak University School of Pharmacy registration number
-// Required formats: PHAM/M/0000/00/00 | PHAM/MK/0000/00/00 | PHAM/MG/0000/00/00
 function computeAccurateRegNo(email: string, yearOfStudy?: string, preferredRegNo?: string): string {
-  if (preferredRegNo && /^PHAM\/(M|MK|MG)\/\d{4}\/\d{2}\/\d{2}$/i.test(preferredRegNo.trim())) {
+  if (preferredRegNo && KUPSA_REG_NO_REGEX.test(preferredRegNo.trim())) {
     return preferredRegNo.trim().toUpperCase();
   }
   const emailDigits = email.match(/([a-zA-Z._-]+)(\d{2})@/);
-  const admissionCohort = emailDigits && emailDigits[2] ? emailDigits[2] : '23';
-  const nextCohort = (parseInt(admissionCohort, 10) + 1).toString().padStart(2, '0');
+  const admissionCohort = emailDigits && emailDigits[2] ? emailDigits[2] : '24';
   const serial = Math.floor(1000 + Math.random() * 9000).toString();
-  return `PHAM/M/${serial}/${admissionCohort}/${nextCohort}`;
+  return `PHARM/M/${serial}/09/${admissionCohort}`;
 }
 
 // Helper: Ensure a voter row exists in public.voters while satisfying the foreign key constraint to auth.users
@@ -934,12 +974,8 @@ app.post('/api/election/settings', async (req: Request, res: Response) => {
   }
 });
 
-// Update Candidate Clearance
+// Update Candidate Clearance & Manifesto
 app.post('/api/candidate/clearance', async (req: Request, res: Response) => {
-  if (!supabaseAdmin) {
-    return res.status(503).json({ error: 'Database service unavailable' });
-  }
-
   const { candidateId, status, notes, name, nickname, photoUrl, manifestoSummary, officerEmail, officerRole } = req.body;
 
   if (!candidateId) {
@@ -955,26 +991,38 @@ app.post('/api/candidate/clearance', async (req: Request, res: Response) => {
     if (photoUrl) updatePayload.photo_url = photoUrl;
     if (manifestoSummary) updatePayload.manifesto_summary = manifestoSummary;
 
-    const { error: updateErr } = await supabaseAdmin
-      .from('candidates')
-      .update(updatePayload)
-      .eq('id', candidateId);
-
-    if (updateErr) {
-      return res.status(500).json({ error: updateErr.message });
+    // Always update in-memory candidate store
+    const memIdx = inMemoryCandidates.findIndex((c) => c.id === candidateId);
+    if (memIdx >= 0) {
+      inMemoryCandidates[memIdx] = {
+        ...inMemoryCandidates[memIdx],
+        ...updatePayload,
+      };
     }
 
-    // Audit Log
-    await supabaseAdmin.from('audit_logs').insert({
-      officer_email: officerEmail || 'commissioner@kabarak.ac.ke',
-      officer_role: officerRole || 'Returning Officer',
-      action_type: 'CANDIDATE_CLEARANCE_UPDATED',
-      details: {
-        candidateId,
-        ...updatePayload,
-        timestamp: new Date().toISOString(),
-      },
-    });
+    // Try updating Supabase if configured
+    if (supabaseAdmin) {
+      const { error: updateErr } = await supabaseAdmin
+        .from('candidates')
+        .update(updatePayload)
+        .eq('id', candidateId);
+
+      if (updateErr) {
+        console.warn('Supabase candidate update warning:', updateErr);
+      }
+
+      // Audit Log
+      await supabaseAdmin.from('audit_logs').insert({
+        officer_email: officerEmail || 'commissioner@kabarak.ac.ke',
+        officer_role: officerRole || 'Returning Officer',
+        action_type: 'CANDIDATE_CLEARANCE_UPDATED',
+        details: {
+          candidateId,
+          ...updatePayload,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
 
     return res.json({ success: true, candidateId, updated: updatePayload });
   } catch (err: any) {
@@ -1018,10 +1066,7 @@ app.post('/api/voter/accredit', async (req: Request, res: Response) => {
 });
 
 // Voter Signup / Registration
-app.post('/api/voter/signup', async (req: Request, res: Response) => {
-  if (!supabaseAdmin) {
-    return res.status(503).json({ error: 'Database service unavailable' });
-  }
+app.post(['/api/voter/signup', '/api/voter/register'], async (req: Request, res: Response) => {
 
   const rawName = (req.body.fullName || req.body.name || req.body.studentName || '').trim();
   const cleanName = rawName || 'Pharmacy Student';
@@ -1033,11 +1078,17 @@ app.post('/api/voter/signup', async (req: Request, res: Response) => {
   }
 
   const userProvidedRegNo = (req.body.regNo || req.body.reg_no || req.body.registrationNumber || '').trim().toUpperCase();
-  const KUPSA_REG_NO_REGEX = /^PHAM\/(M|MK|MG)\/\d{4}\/\d{2}\/\d{2}$/i;
 
   if (!userProvidedRegNo || !KUPSA_REG_NO_REGEX.test(userProvidedRegNo)) {
     return res.status(400).json({
-      error: 'Invalid registration number format. Required format: PHAM/M/0000/00/00, PHAM/MK/0000/00/00, or PHAM/MG/0000/00/00',
+      error: 'Invalid student registration number format.',
+    });
+  }
+
+  const expectedYear = getExpectedYearOfStudy(userProvidedRegNo);
+  if (!expectedYear || (yearOfStudy && yearOfStudy !== expectedYear)) {
+    return res.status(400).json({
+      error: `Year of study mismatch: Registration number corresponds to ${expectedYear || 'a different cohort'}. Account cannot be created.`,
     });
   }
 
@@ -1097,12 +1148,14 @@ app.post('/api/voter/signup', async (req: Request, res: Response) => {
       yearOfStudy: voter.year_of_study || yearOfStudy,
     });
 
-    await supabaseAdmin.from('audit_logs').insert({
-      officer_email: 'self-service.registration@kabarak.ac.ke',
-      officer_role: 'Automated Registrar',
-      action_type: 'VOTER_REGISTERED',
-      details: { email: cleanEmail, regNo: voter.reg_no, yearOfStudy, timestamp: new Date().toISOString() },
-    });
+    if (supabaseAdmin) {
+      await supabaseAdmin.from('audit_logs').insert({
+        officer_email: 'self-service.registration@kabarak.ac.ke',
+        officer_role: 'Automated Registrar',
+        action_type: 'VOTER_REGISTERED',
+        details: { email: cleanEmail, regNo: voter.reg_no, yearOfStudy, timestamp: new Date().toISOString() },
+      });
+    }
 
     // Automatically enqueue and dispatch passcard email
     const portalUrl = (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).trim();

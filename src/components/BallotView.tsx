@@ -524,11 +524,19 @@ export function BallotView({ onNavigate }: BallotViewProps) {
                         >
                           {/* Full Background Candidate Image / Portrait Pluck */}
                           <div className="absolute inset-0 z-0 bg-[#286746]">
+                            {/* Watermark initials fallback */}
+                            <div
+                              className="absolute inset-0 z-0 flex items-center justify-center font-display text-8xl font-bold text-white/20 select-none pointer-events-none"
+                              style={{ backgroundColor: cand.photoPlaceholderBg || '#286746' }}
+                            >
+                              {cand.initials}
+                            </div>
+
                             {cand.photoUrl ? (
                               <img
                                 src={cand.photoUrl}
                                 alt={cand.name}
-                                className="h-full w-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-105"
+                                className="absolute inset-0 z-10 h-full w-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-105"
                                 loading="lazy"
                                 onError={(e) => {
                                   (e.currentTarget as HTMLElement).style.display = 'none';
@@ -536,16 +544,8 @@ export function BallotView({ onNavigate }: BallotViewProps) {
                               />
                             ) : null}
 
-                            {/* Watermark initials fallback */}
-                            <div
-                              className="absolute inset-0 flex items-center justify-center font-display text-8xl font-bold text-white/20 select-none pointer-events-none"
-                              style={{ backgroundColor: cand.photoPlaceholderBg || '#286746' }}
-                            >
-                              {cand.initials}
-                            </div>
-
                             {/* Multi-stage Scrim Overlay for crisp contrast */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/20" />
+                            <div className="absolute inset-0 z-20 bg-gradient-to-t from-black/95 via-black/40 to-black/20 pointer-events-none" />
                           </div>
 
                           {/* Top Badges Bar: Year of Study + Radio Selection Check Circle */}
