@@ -167,7 +167,13 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // Settings (Default isResultsLive is false / embargoed until toggled live by commission)
   const [isResultsLive, setIsResultsLiveState] = useState<boolean>(false);
-  const [isPollsOpen, setIsPollsOpenState] = useState<boolean>(true);
+  const [isPollsOpen, setIsPollsOpenState] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('kupsa_polls_open_v2');
+      if (saved !== null) return saved === 'true';
+    } catch {}
+    return true;
+  });
   const [electionPhase, setElectionPhaseState] = useState<'pre-election' | 'polling-live' | 'counting' | 'results-declared'>('polling-live');
   const [announcementBanner, setAnnouncementBannerState] = useState<string>('');
 
@@ -234,11 +240,14 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setIsResultsLiveState(Boolean(state.settings.is_results_live));
         if (state.settings.election_phase) {
           setElectionPhaseState(state.settings.election_phase);
-          setIsPollsOpenState(state.settings.election_phase === 'polling-live');
         }
-        if (state.settings.is_polls_open !== undefined) {
-          setIsPollsOpenState(Boolean(state.settings.is_polls_open));
-        }
+        const openFlag = state.settings.is_polls_open !== undefined
+          ? Boolean(state.settings.is_polls_open)
+          : (state.settings.election_phase === 'polling-live' && !state.settings.polls_close_at);
+        setIsPollsOpenState(openFlag);
+        try {
+          localStorage.setItem('kupsa_polls_open_v2', String(openFlag));
+        } catch {}
         if (state.settings.announcement_banner !== undefined) {
           setAnnouncementBannerState(state.settings.announcement_banner || '');
         }
@@ -331,6 +340,13 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
         }
         if (updatedSettings.election_phase) {
           setElectionPhaseState(updatedSettings.election_phase);
+          const openFlag = updatedSettings.is_polls_open !== undefined
+            ? Boolean(updatedSettings.is_polls_open)
+            : (updatedSettings.election_phase === 'polling-live' && !updatedSettings.polls_close_at);
+          setIsPollsOpenState(openFlag);
+          try {
+            localStorage.setItem('kupsa_polls_open_v2', String(openFlag));
+          } catch {}
         }
         if (updatedSettings.announcement_banner) {
           setAnnouncementBannerState(updatedSettings.announcement_banner);
@@ -472,6 +488,9 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
   // Setter wrapper for Polls Open / Lock (syncs to server and database)
   const setIsPollsOpen = async (val: boolean) => {
     setIsPollsOpenState(val);
+    try {
+      localStorage.setItem('kupsa_polls_open_v2', String(val));
+    } catch {}
     const targetPhase = val ? 'polling-live' : 'counting';
     setElectionPhaseState(targetPhase);
     try {

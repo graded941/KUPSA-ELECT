@@ -517,7 +517,18 @@ app.get('/api/election/state', async (_req: Request, res: Response) => {
         supabaseAdmin.from('ballots').select('*').order('created_at', { ascending: false }),
       ]);
 
-      if (settingsRes.data) inMemorySettings = { ...inMemorySettings, ...settingsRes.data };
+      if (settingsRes.data) {
+        const isActuallyOpen =
+          settingsRes.data.is_polls_open !== undefined
+            ? Boolean(settingsRes.data.is_polls_open)
+            : settingsRes.data.election_phase === 'polling-live' && !settingsRes.data.polls_close_at;
+
+        inMemorySettings = {
+          ...inMemorySettings,
+          ...settingsRes.data,
+          is_polls_open: isActuallyOpen,
+        };
+      }
       if (officesRes.data && officesRes.data.length > 0) inMemoryOffices = officesRes.data;
       if (candsRes.data && candsRes.data.length > 0) {
         inMemoryCandidates = candsRes.data.map((c: any) => ({
@@ -1029,31 +1040,55 @@ app.post('/api/election/settings', async (req: Request, res: Response) => {
     if (typeof isResultsLive === 'boolean') updatePayload.is_results_live = isResultsLive;
     if (typeof electionPhase === 'string') updatePayload.election_phase = electionPhase;
     if (typeof announcementBanner === 'string') updatePayload.announcement_banner = announcementBanner;
+
+    let targetIsPollsOpen = typeof isPollsOpen === 'boolean' ? isPollsOpen : inMemorySettings.is_polls_open;
     if (typeof isPollsOpen === 'boolean') {
-      updatePayload.is_polls_open = isPollsOpen;
       updatePayload.election_phase = isPollsOpen ? 'polling-live' : 'counting';
+      updatePayload.polls_close_at = isPollsOpen ? null : new Date().toISOString();
+      if (isPollsOpen) {
+        updatePayload.polls_open_at = new Date().toISOString();
+      }
+      targetIsPollsOpen = isPollsOpen;
     }
 
     // Always keep in-memory snapshot updated
     inMemorySettings = {
       ...inMemorySettings,
       ...updatePayload,
+      is_polls_open: targetIsPollsOpen,
     };
 
     if (supabaseAdmin) {
+      // Columns accepted by Supabase election_settings table
+      const supabasePayload: any = {
+        updated_at: updatePayload.updated_at,
+      };
+      if (updatePayload.is_results_live !== undefined) supabasePayload.is_results_live = updatePayload.is_results_live;
+      if (updatePayload.election_phase !== undefined) supabasePayload.election_phase = updatePayload.election_phase;
+      if (updatePayload.announcement_banner !== undefined) supabasePayload.announcement_banner = updatePayload.announcement_banner;
+      if (updatePayload.polls_close_at !== undefined) supabasePayload.polls_close_at = updatePayload.polls_close_at;
+      if (updatePayload.polls_open_at !== undefined) supabasePayload.polls_open_at = updatePayload.polls_open_at;
+
       // Get primary settings record id
       const { data: existing } = await supabaseAdmin.from('election_settings').select('id').limit(1).maybeSingle();
 
       if (existing) {
-        await supabaseAdmin.from('election_settings').update(updatePayload).eq('id', existing.id);
+        const { error: updateErr } = await supabaseAdmin.from('election_settings').update(supabasePayload).eq('id', existing.id);
+        if (updateErr) {
+          console.error('Supabase settings update error:', updateErr);
+          throw updateErr;
+        }
       } else {
-        await supabaseAdmin.from('election_settings').insert({
-          ...updatePayload,
-          is_results_live: updatePayload.is_results_live ?? false,
-          is_polls_open: updatePayload.is_polls_open ?? true,
-          election_phase: updatePayload.election_phase ?? 'polling-live',
-          announcement_banner: updatePayload.announcement_banner ?? '',
+        const { error: insErr } = await supabaseAdmin.from('election_settings').insert({
+          ...supabasePayload,
+          is_results_live: supabasePayload.is_results_live ?? false,
+          election_phase: supabasePayload.election_phase ?? 'polling-live',
+          announcement_banner: supabasePayload.announcement_banner ?? '',
         });
+        if (insErr) {
+          console.error('Supabase settings insert error:', insErr);
+          throw insErr;
+        }
       }
 
       // Audit Log
@@ -1061,11 +1096,15 @@ app.post('/api/election/settings', async (req: Request, res: Response) => {
         officer_email: officerEmail || 'commissioner@kabarak.ac.ke',
         officer_role: officerRole || 'Electoral Commission',
         action_type: 'SETTINGS_MODIFIED',
-        details: updatePayload,
+        details: { ...updatePayload, isPollsOpen: targetIsPollsOpen },
       });
     }
 
-    return res.json({ success: true, updated: updatePayload, current: inMemorySettings });
+    return res.json({
+      success: true,
+      updated: { ...updatePayload, is_polls_open: targetIsPollsOpen },
+      current: inMemorySettings,
+    });
   } catch (err: any) {
     console.error('Update settings error:', err);
     return res.status(500).json({ error: err.message });

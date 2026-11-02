@@ -102,7 +102,15 @@ export async function fetchLiveElectionState(): Promise<ElectionFullState> {
     ]);
 
     return {
-      settings: settingsRes.data || null,
+      settings: settingsRes.data
+        ? {
+            ...settingsRes.data,
+            is_polls_open:
+              settingsRes.data.is_polls_open !== undefined
+                ? Boolean(settingsRes.data.is_polls_open)
+                : settingsRes.data.election_phase === 'polling-live' && !settingsRes.data.polls_close_at,
+          }
+        : null,
       offices: officesRes.data || [],
       candidates: candidatesRes.data || [],
       voters: votersRes.data || [],
@@ -204,8 +212,11 @@ export async function updateElectionSettingsApi(payload: {
     if (typeof payload.electionPhase === 'string') updatePayload.election_phase = payload.electionPhase;
     if (typeof payload.announcementBanner === 'string') updatePayload.announcement_banner = payload.announcementBanner;
     if (typeof payload.isPollsOpen === 'boolean') {
-      updatePayload.is_polls_open = payload.isPollsOpen;
       updatePayload.election_phase = payload.isPollsOpen ? 'polling-live' : 'counting';
+      updatePayload.polls_close_at = payload.isPollsOpen ? null : new Date().toISOString();
+      if (payload.isPollsOpen) {
+        updatePayload.polls_open_at = new Date().toISOString();
+      }
     }
 
     const { data: existing } = await supabase.from('election_settings').select('id').limit(1).maybeSingle();
