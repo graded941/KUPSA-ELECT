@@ -612,7 +612,7 @@ export const CONTINGENCY_PROTOCOLS = [
     id: 'cont-02',
     scenario: 'Student Registrar Roster Discrepancy',
     constitutionalAuthority: 'Article 42(a) & 45(1)',
-    mitigation: 'Physical Helpdesk Room PH-104 staffed with Dean-appointed administrative officer. Provisional validation issued upon student showing fee clearance slip and active semester exam card.',
+    mitigation: 'Physical Helpdesk in University Library staffed with Dean-appointed administrative officer. Provisional validation issued upon student showing fee clearance slip and active semester exam card.',
     actionRequired: 'Dual authorization by Returning Officer and Registrar liaison.'
   },
   {

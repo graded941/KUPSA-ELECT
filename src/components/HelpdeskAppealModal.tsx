@@ -38,7 +38,7 @@ export const HelpdeskAppealModal: React.FC<HelpdeskAppealModalProps> = ({
       ticketId: `KUPSA-HELP-${Math.floor(1000 + Math.random() * 9000)}`,
       submittedAt: 'Just now (Simulated)',
       priority: 'High Priority (Electoral Window)',
-      status: 'Queued for Dean Registrar Liaison Desk (Room PH-104)'
+      status: 'Queued for Dean Registrar Liaison Desk (University Library)'
     });
   };
 

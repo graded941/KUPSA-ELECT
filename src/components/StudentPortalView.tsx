@@ -224,7 +224,7 @@ export function StudentPortalView({ onNavigate }: StudentPortalViewProps) {
                 <div className="mt-6 rounded-2xl bg-muted/60 p-5 text-muted-foreground animate-in fade-in">
                   <p className="font-semibold text-foreground">Registration Number Not Found</p>
                   <p className="mt-1 text-sm">
-                    We couldn't match "{regNo}" in the accredited School of Pharmacy roster. Please verify your student number or visit the Commission Helpdesk in Room PH-104.
+                    We couldn't match "{regNo}" in the accredited School of Pharmacy roster. Please verify your student number or visit the Commission Helpdesk in the University Library.
                   </p>
                 </div>
               )}

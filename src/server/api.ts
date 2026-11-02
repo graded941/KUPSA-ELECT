@@ -858,6 +858,70 @@ app.post('/api/ballot/cast', async (req: Request, res: Response) => {
   }
 });
 
+// Simulate Votes for Mock Election & Readiness Testing
+app.post('/api/election/simulate-candidate-votes', async (req: Request, res: Response) => {
+  const { candidateId = 'cand-pres-01', count = 50, officeId = 'president' } = req.body;
+  const numVotes = Math.min(Math.max(1, Number(count) || 50), 500);
+
+  const cohorts = ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'];
+  const sgCandidates = ['cand-sg-01', 'cand-sg-02', 'cand-sg-03'];
+  const dsgCandidates = ['cand-dsg-01', 'cand-dsg-02'];
+  const mediaCandidates = ['cand-media-01', 'cand-media-02', 'cand-media-03'];
+  const orgCandidates = ['cand-org-01', 'cand-org-02'];
+
+  const ballotsToInsert: any[] = [];
+  const baseTime = Date.now();
+
+  for (let i = 0; i < numVotes; i++) {
+    const ballotId = crypto.randomUUID();
+    const receiptCode = `KUPSA-2026-SIM-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const voterYear = cohorts[i % cohorts.length];
+    const timestamp = new Date(baseTime - (numVotes - i) * 45000).toISOString();
+
+    const choices: Record<string, string> = {
+      [officeId]: candidateId,
+      'vice-president': 'cand-vp-01',
+      'sec-general': sgCandidates[i % sgCandidates.length],
+      'dep-sec-general': dsgCandidates[i % dsgCandidates.length],
+      treasurer: 'cand-tres-01',
+      'media-officer': mediaCandidates[i % mediaCandidates.length],
+      'org-sec': orgCandidates[i % orgCandidates.length],
+    };
+
+    ballotsToInsert.push({
+      id: ballotId,
+      receipt_code: receiptCode,
+      voter_year: voterYear,
+      choices,
+      created_at: timestamp,
+    });
+  }
+
+  // Update in-memory
+  inMemoryBallots = [...ballotsToInsert, ...inMemoryBallots];
+
+  // Insert to Supabase if configured
+  if (supabaseAdmin) {
+    try {
+      const { error: insertErr } = await supabaseAdmin.from('ballots').insert(ballotsToInsert);
+      if (insertErr) {
+        console.warn('Supabase ballot bulk insert notice:', insertErr);
+      }
+    } catch (dbErr) {
+      console.warn('Database simulation insert warning:', dbErr);
+    }
+  }
+
+  return res.json({
+    success: true,
+    simulatedCount: ballotsToInsert.length,
+    candidateId,
+    candidateName: candidateId === 'cand-pres-01' ? 'Wambua Titus' : candidateId,
+    totalBallots: inMemoryBallots.length,
+    message: `Successfully simulated ${ballotsToInsert.length} votes for Wambua Titus.`,
+  });
+});
+
 // Seed Official Election Roster (Offices, Candidates, Voters)
 app.post('/api/election/seed', async (req: Request, res: Response) => {
   if (!supabaseAdmin) {

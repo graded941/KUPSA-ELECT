@@ -2,9 +2,8 @@ import React, { useState, type FormEvent } from 'react';
 import { ViewId, DisputeSubmission } from '../types';
 import { OFFICES } from '../data/election';
 import { PageIntro } from './site-shell';
-import { CheckCircle2, LifeBuoy, Scale, MapPin, Mail, Clock, Download, ExternalLink } from 'lucide-react';
+import { CheckCircle2, LifeBuoy, Scale, MapPin, Mail, Clock } from 'lucide-react';
 import { submitConstitutionalPetition } from '../lib/electionService';
-import { ConstitutionalPetitionModal } from './ConstitutionalPetitionModal';
 
 interface HelpViewProps {
   onNavigate: (view: ViewId) => void;
@@ -31,7 +30,6 @@ function SentFeedback({ text, onReset }: { text: string; onReset: () => void }) 
 export function HelpView({ onNavigate }: HelpViewProps) {
   const [helpSent, setHelpSent] = useState(false);
   const [appealSent, setAppealSent] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Real appeal form state
   const [appealName, setAppealName] = useState('');
@@ -89,7 +87,7 @@ export function HelpView({ onNavigate }: HelpViewProps) {
             </span>
             <div>
               <p className="font-display font-semibold text-foreground">Physical Secretariat</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Room PH-104, School of Pharmacy</p>
+              <p className="text-xs text-muted-foreground mt-0.5">University Library</p>
             </div>
           </div>
 
@@ -99,7 +97,7 @@ export function HelpView({ onNavigate }: HelpViewProps) {
             </span>
             <div>
               <p className="font-display font-semibold text-foreground">Official Email</p>
-              <p className="text-xs text-muted-foreground mt-0.5">elections@kupsa.kabarak.ac.ke</p>
+              <p className="text-xs text-muted-foreground mt-0.5">kupsaofficials@kabarak.ac.ke</p>
             </div>
           </div>
 
@@ -165,26 +163,16 @@ export function HelpView({ onNavigate }: HelpViewProps) {
           {/* Form 2: Official Appeal */}
           <section className="flex flex-col justify-between rounded-2xl border-2 border-ink bg-card p-6 sm:p-8 shadow-pop">
             <div>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span className="bg-brand flex h-10 w-10 items-center justify-center rounded-xl text-ink">
-                    <Scale className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <h3 className="font-display text-2xl font-semibold text-foreground">File an appeal</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Article 51 Petitions reviewed directly by the Commission and the Patron.
-                    </p>
-                  </div>
+              <div className="flex items-center gap-3">
+                <span className="bg-brand flex h-10 w-10 items-center justify-center rounded-xl text-ink">
+                  <Scale className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="font-display text-2xl font-semibold text-foreground">File an appeal</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Article 51 Petitions reviewed directly by the Commission and the Patron.
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(true)}
-                  className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-foreground underline cursor-pointer"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Interactive Docket</span>
-                </button>
               </div>
 
               {appealSent && filedDocket ? (
@@ -220,14 +208,7 @@ export function HelpView({ onNavigate }: HelpViewProps) {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsModalOpen(true)}
-                      className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors cursor-pointer"
-                    >
-                      Track Live Docket & Rulings
-                    </button>
+                  <div className="pt-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -235,7 +216,7 @@ export function HelpView({ onNavigate }: HelpViewProps) {
                         setFiledDocket(null);
                         setAppealGrounds('');
                       }}
-                      className="px-4 py-2 rounded-full border border-border text-foreground text-xs font-semibold hover:bg-secondary/50 transition-colors cursor-pointer"
+                      className="px-5 py-2.5 rounded-full bg-ink text-ink-foreground text-xs font-semibold hover:bg-primary transition-colors cursor-pointer"
                     >
                       Submit Another Petition
                     </button>
@@ -290,20 +271,13 @@ export function HelpView({ onNavigate }: HelpViewProps) {
                     className={inputClass}
                     placeholder="Describe what occurred, citing relevant constitutional articles (e.g. Art. 44, Art. 46, Art. 51)..."
                   />
-                  <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+                  <div>
                     <button
                       type="submit"
                       disabled={isSubmittingAppeal}
                       className="w-full sm:w-auto rounded-full bg-primary px-6 py-3 font-semibold text-sm text-primary-foreground shadow-xs hover:bg-ink transition-colors cursor-pointer disabled:opacity-50"
                     >
                       {isSubmittingAppeal ? 'Docketing Petition...' : 'Submit formal appeal (Article 51)'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsModalOpen(true)}
-                      className="text-xs font-semibold text-muted-foreground hover:text-foreground underline cursor-pointer"
-                    >
-                      Open Full Constitutional Tribunal Modal
                     </button>
                   </div>
                 </form>
@@ -312,11 +286,6 @@ export function HelpView({ onNavigate }: HelpViewProps) {
           </section>
         </div>
       </div>
-
-      <ConstitutionalPetitionModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
     </>
   );
 }
