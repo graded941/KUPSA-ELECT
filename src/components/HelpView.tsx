@@ -142,7 +142,7 @@ export function HelpView({ onNavigate }: HelpViewProps) {
                   <input
                     required
                     className={`${inputClass} font-mono uppercase`}
-                    placeholder="Student registration number (e.g. PHAM/M/0000/00/00)"
+                    placeholder="Student registration number"
                   />
                   <input required type="email" className={inputClass} placeholder="Student email address" />
                   <textarea
@@ -256,7 +256,7 @@ export function HelpView({ onNavigate }: HelpViewProps) {
                       value={appealRegNo}
                       onChange={(e) => setAppealRegNo(e.target.value)}
                       className={`${inputClass} font-mono uppercase`}
-                      placeholder="Reg No (e.g. PHARM/2024/1882)"
+                      placeholder="Student registration number"
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -244,7 +244,7 @@ export const CONSTITUTIONAL_ARTICLES: ConstitutionalArticle[] = [
     keyRequirements: [
       'Strict constitutional date: Friday, 6th of November 2026',
       'Any alteration requires 2/3 executive majority and Patron concurrence',
-      'Polls open 08:00 EAT and close 17:00 EAT on polling day'
+      'Polls open 06:00 EAT (6:00 AM) and close 16:00 EAT (4:00 PM) on polling day'
     ]
   },
   {

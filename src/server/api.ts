@@ -410,14 +410,16 @@ interface ElectionSettingsState {
   is_results_live: boolean;
   election_phase: 'pre-election' | 'polling-live' | 'counting' | 'results-declared';
   announcement_banner: string;
+  is_polls_open?: boolean;
   updated_at?: string;
 }
 
 let inMemorySettings: ElectionSettingsState = {
   id: 1,
   is_results_live: false,
+  is_polls_open: true,
   election_phase: 'polling-live',
-  announcement_banner: 'Official Notice: General Polling in session under Chapter Six statutory authority.',
+  announcement_banner: 'Official Notice: General Polling in session under Chapter Six statutory authority (06:00 – 16:00 EAT).',
   updated_at: new Date().toISOString(),
 };
 
@@ -540,36 +542,51 @@ app.get('/api/election/state', async (_req: Request, res: Response) => {
 });
 
 // Helper: Registration Number format validator and cohort year aligner
-const KUPSA_REG_NO_REGEX = /^PHAR?M\/(M|MK|MG|MS)\/\d{4}\/(0[1-9]|1[0-2]|\d{2})\/(\d{2}|\d{4})$/i;
+const KUPSA_REG_NO_REGEX =
+  /^PHAR?M\s*\/\s*(M|MK|MG|MS)\s*\/\s*\d{4}\s*\/\s*(0?[1-9]|1[0-2]|[A-Za-z]{3,9}|\d{1,2})\s*[\/-]?\s*(\d{2}|\d{4})$/i;
 
-function getExpectedYearOfStudy(regNo: string): string | null {
+function parseRegNoDetails(regNo: string): { prefix: string; yearNumber: number } | null {
   const match = regNo.trim().match(KUPSA_REG_NO_REGEX);
   if (!match) return null;
 
   const prefix = match[1].toUpperCase();
-  if (prefix === 'MS') {
-    return 'Masters';
-  }
-
   const rawYear = match[3];
-  const admissionYear = rawYear.length === 4 ? parseInt(rawYear, 10) : 2000 + parseInt(rawYear, 10);
+  const yearNumber = rawYear.length === 4 ? parseInt(rawYear, 10) : 2000 + parseInt(rawYear, 10);
 
-  switch (admissionYear) {
-    case 2026:
-      return 'Year 1';
-    case 2025:
-      return 'Year 2';
-    case 2024:
-      return 'Year 3';
-    case 2023:
-      return 'Year 4';
-    case 2022:
-      return 'Year 5';
-    default:
-      if (admissionYear < 2022) return 'Year 5';
-      if (admissionYear > 2026) return 'Year 1';
-      return null;
+  return { prefix, yearNumber };
+}
+
+function getValidCohortYears(regNo: string): string[] {
+  const parsed = parseRegNoDetails(regNo);
+  if (!parsed) return [];
+
+  if (parsed.prefix === 'MS') {
+    return ['Masters'];
   }
+
+  switch (parsed.yearNumber) {
+    case 2026:
+      return ['Year 1'];
+    case 2025:
+      return ['Year 1', 'Year 2'];
+    case 2024:
+      return ['Year 1', 'Year 2', 'Year 3'];
+    case 2023:
+      return ['Year 2', 'Year 3', 'Year 4'];
+    case 2022:
+      return ['Year 3', 'Year 4', 'Year 5'];
+    case 2021:
+      return ['Year 4', 'Year 5'];
+    default:
+      if (parsed.yearNumber < 2021) return ['Year 5'];
+      return ['Year 1'];
+  }
+}
+
+function isYearOfStudyAligned(regNo: string, yearOfStudy: string): boolean {
+  if (!regNo || !yearOfStudy) return false;
+  const valid = getValidCohortYears(regNo);
+  return valid.includes(yearOfStudy);
 }
 
 // Helper: Compute realistic Kabarak University School of Pharmacy registration number
@@ -723,12 +740,20 @@ app.post('/api/ballot/cast', async (req: Request, res: Response) => {
   }
 
   try {
-    // 1. Verify election settings (must be in polling-live)
-    const { data: settings } = await supabaseAdmin.from('election_settings').select('election_phase').limit(1).maybeSingle();
-    if (settings && settings.election_phase !== 'polling-live') {
+    // 1. Verify election settings (must be in polling-live and polls not locked)
+    if (inMemorySettings.is_polls_open === false || inMemorySettings.election_phase !== 'polling-live') {
       return res.status(403).json({
-        error: `Voting is currently locked. Statutory Election Phase: ${settings.election_phase}`,
+        error: 'Voting is currently locked by the Electoral Commission. Official polling hours are from 6:00 AM to 4:00 PM (16:00 EAT).',
       });
+    }
+
+    if (supabaseAdmin) {
+      const { data: settings } = await supabaseAdmin.from('election_settings').select('election_phase, is_polls_open').limit(1).maybeSingle();
+      if (settings && (settings.election_phase !== 'polling-live' || settings.is_polls_open === false)) {
+        return res.status(403).json({
+          error: 'Voting is currently locked by the Electoral Commission. Official polling hours are from 6:00 AM to 4:00 PM (16:00 EAT).',
+        });
+      }
     }
 
     // 2. Fetch or auto-provision voter record (satisfying voters_id_fkey)
@@ -933,41 +958,50 @@ app.post('/api/election/seed', async (req: Request, res: Response) => {
 
 // Update Election Settings
 app.post('/api/election/settings', async (req: Request, res: Response) => {
-  if (!supabaseAdmin) {
-    return res.status(503).json({ error: 'Database service unavailable' });
-  }
-
-  const { isResultsLive, electionPhase, announcementBanner, officerEmail, officerRole } = req.body;
+  const { isResultsLive, electionPhase, announcementBanner, isPollsOpen, officerEmail, officerRole } = req.body;
 
   try {
     const updatePayload: any = { updated_at: new Date().toISOString() };
     if (typeof isResultsLive === 'boolean') updatePayload.is_results_live = isResultsLive;
     if (typeof electionPhase === 'string') updatePayload.election_phase = electionPhase;
     if (typeof announcementBanner === 'string') updatePayload.announcement_banner = announcementBanner;
+    if (typeof isPollsOpen === 'boolean') {
+      updatePayload.is_polls_open = isPollsOpen;
+      updatePayload.election_phase = isPollsOpen ? 'polling-live' : 'counting';
+    }
 
-    // Get primary settings record id
-    const { data: existing } = await supabaseAdmin.from('election_settings').select('id').limit(1).maybeSingle();
+    // Always keep in-memory snapshot updated
+    inMemorySettings = {
+      ...inMemorySettings,
+      ...updatePayload,
+    };
 
-    if (existing) {
-      await supabaseAdmin.from('election_settings').update(updatePayload).eq('id', existing.id);
-    } else {
-      await supabaseAdmin.from('election_settings').insert({
-        ...updatePayload,
-        is_results_live: updatePayload.is_results_live ?? false,
-        election_phase: updatePayload.election_phase ?? 'polling-live',
-        announcement_banner: updatePayload.announcement_banner ?? '',
+    if (supabaseAdmin) {
+      // Get primary settings record id
+      const { data: existing } = await supabaseAdmin.from('election_settings').select('id').limit(1).maybeSingle();
+
+      if (existing) {
+        await supabaseAdmin.from('election_settings').update(updatePayload).eq('id', existing.id);
+      } else {
+        await supabaseAdmin.from('election_settings').insert({
+          ...updatePayload,
+          is_results_live: updatePayload.is_results_live ?? false,
+          is_polls_open: updatePayload.is_polls_open ?? true,
+          election_phase: updatePayload.election_phase ?? 'polling-live',
+          announcement_banner: updatePayload.announcement_banner ?? '',
+        });
+      }
+
+      // Audit Log
+      await supabaseAdmin.from('audit_logs').insert({
+        officer_email: officerEmail || 'commissioner@kabarak.ac.ke',
+        officer_role: officerRole || 'Electoral Commission',
+        action_type: 'SETTINGS_MODIFIED',
+        details: updatePayload,
       });
     }
 
-    // Audit Log
-    await supabaseAdmin.from('audit_logs').insert({
-      officer_email: officerEmail || 'commissioner@kabarak.ac.ke',
-      officer_role: officerRole || 'Electoral Commission',
-      action_type: 'SETTINGS_MODIFIED',
-      details: updatePayload,
-    });
-
-    return res.json({ success: true, updated: updatePayload });
+    return res.json({ success: true, updated: updatePayload, current: inMemorySettings });
   } catch (err: any) {
     console.error('Update settings error:', err);
     return res.status(500).json({ error: err.message });
@@ -1085,10 +1119,10 @@ app.post(['/api/voter/signup', '/api/voter/register'], async (req: Request, res:
     });
   }
 
-  const expectedYear = getExpectedYearOfStudy(userProvidedRegNo);
-  if (!expectedYear || (yearOfStudy && yearOfStudy !== expectedYear)) {
+  if (yearOfStudy && !isYearOfStudyAligned(userProvidedRegNo, yearOfStudy)) {
+    const valid = getValidCohortYears(userProvidedRegNo);
     return res.status(400).json({
-      error: `Year of study mismatch: Registration number corresponds to ${expectedYear || 'a different cohort'}. Account cannot be created.`,
+      error: `Year of study does not align with your cohort year based on registration number. Expected ${valid.join(' or ')}. Account cannot be created.`,
     });
   }
 
@@ -1586,6 +1620,157 @@ app.post('/api/admin/purge-voters', async (_req: Request, res: Response) => {
     console.error('Purge voters error:', err);
     return res.status(500).json({ error: err.message || 'Failed to purge voters' });
   }
+});
+
+// Delete individual voter
+app.post('/api/admin/delete-voter', async (req: Request, res: Response) => {
+  const { regNo, email, id } = req.body;
+  if (!regNo && !email && !id) {
+    return res.status(400).json({ error: 'regNo, email, or id is required' });
+  }
+
+  const cleanEmail = (email || '').toLowerCase().trim();
+  const cleanReg = (regNo || '').toUpperCase().trim();
+
+  // Remove from in-memory voters
+  inMemoryVoters = inMemoryVoters.filter((v) => {
+    if (id && v.id === id) return false;
+    if (cleanEmail && v.email?.toLowerCase() === cleanEmail) return false;
+    if (cleanReg && v.reg_no?.toUpperCase() === cleanReg) return false;
+    return true;
+  });
+
+  if (cleanEmail) {
+    voterPinStore.delete(cleanEmail);
+  }
+
+  if (supabaseAdmin) {
+    try {
+      let query = supabaseAdmin.from('voters').delete();
+      if (id) {
+        query = query.eq('id', id);
+      } else if (cleanReg) {
+        query = query.eq('reg_no', cleanReg);
+      } else if (cleanEmail) {
+        query = query.ilike('email', cleanEmail);
+      }
+      await query;
+    } catch (err: any) {
+      console.warn('Supabase delete voter warning:', err);
+    }
+  }
+
+  return res.json({ success: true, message: 'Student removed from voter roll' });
+});
+
+// Bulk Import Voters from Excel / CSV
+app.post('/api/admin/bulk-import-voters', async (req: Request, res: Response) => {
+  const { students, officerEmail, officerRole } = req.body;
+  if (!Array.isArray(students) || students.length === 0) {
+    return res.status(400).json({ error: 'Payload must contain a non-empty array of students' });
+  }
+
+  let importedCount = 0;
+  let updatedCount = 0;
+  const errors: string[] = [];
+  const processedVoters: any[] = [];
+
+  for (let i = 0; i < students.length; i++) {
+    const raw = students[i];
+    const rawEmail = (raw.email || '').trim().toLowerCase();
+    const rawRegNo = (raw.regNo || raw.reg_no || raw.registrationNumber || '').trim().toUpperCase();
+    const rawName = (raw.name || raw.fullName || raw.studentName || '').trim();
+    let yearOfStudy = (raw.yearOfStudy || raw.year_of_study || raw.cohort || 'Year 1').trim();
+
+    // Normalize Year of study
+    if (/^1$|^year\s*1/i.test(yearOfStudy)) yearOfStudy = 'Year 1';
+    else if (/^2$|^year\s*2/i.test(yearOfStudy)) yearOfStudy = 'Year 2';
+    else if (/^3$|^year\s*3/i.test(yearOfStudy)) yearOfStudy = 'Year 3';
+    else if (/^4$|^year\s*4/i.test(yearOfStudy)) yearOfStudy = 'Year 4';
+    else if (/^5$|^year\s*5/i.test(yearOfStudy)) yearOfStudy = 'Year 5';
+    else if (/master/i.test(yearOfStudy)) yearOfStudy = 'Masters';
+
+    if (!rawEmail || !rawEmail.includes('@')) {
+      errors.push(`Row ${i + 1} (${rawName || 'Unknown'}): Invalid email address '${rawEmail}'`);
+      continue;
+    }
+
+    try {
+      // Check existing in Supabase or memory
+      const existing = inMemoryVoters.find(
+        (v) => v.email.toLowerCase() === rawEmail || (rawRegNo && v.reg_no?.toUpperCase() === rawRegNo)
+      );
+
+      if (existing) {
+        // Update existing record
+        existing.full_name = rawName || existing.full_name;
+        existing.year_of_study = yearOfStudy || existing.year_of_study;
+        if (rawRegNo) existing.reg_no = rawRegNo;
+        if (raw.status) existing.accreditation_status = raw.status === 'Eligible' ? 'Eligible' : existing.accreditation_status;
+
+        if (supabaseAdmin) {
+          await supabaseAdmin
+            .from('voters')
+            .update({
+              full_name: existing.full_name,
+              year_of_study: existing.year_of_study,
+              reg_no: existing.reg_no,
+              accreditation_status: existing.accreditation_status,
+            })
+            .eq('id', existing.id);
+        }
+        updatedCount++;
+        processedVoters.push(existing);
+      } else {
+        // Insert new voter
+        const created = await ensureVoterRecord(
+          rawEmail,
+          rawName,
+          yearOfStudy,
+          raw.password || undefined,
+          rawRegNo
+        );
+        if (created) {
+          importedCount++;
+          processedVoters.push(created);
+        } else {
+          errors.push(`Row ${i + 1} (${rawEmail}): Could not create voter record`);
+        }
+      }
+    } catch (rowErr: any) {
+      errors.push(`Row ${i + 1} (${rawEmail}): ${rowErr.message}`);
+    }
+  }
+
+  // Audit log
+  if (supabaseAdmin) {
+    try {
+      await supabaseAdmin.from('audit_logs').insert({
+        officer_email: officerEmail || 'commissioner@kabarak.ac.ke',
+        officer_role: officerRole || 'Electoral Commissioner',
+        action_type: 'BULK_VOTERS_IMPORTED_FROM_EXCEL',
+        details: {
+          importedCount,
+          updatedCount,
+          totalRows: students.length,
+          errorCount: errors.length,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (auditErr) {
+      console.warn('Audit log notice:', auditErr);
+    }
+  }
+
+  return res.json({
+    success: true,
+    importedCount,
+    updatedCount,
+    totalReceived: students.length,
+    errors,
+    voters: inMemoryVoters,
+    message: `Processed ${students.length} students: ${importedCount} imported, ${updatedCount} updated.${errors.length ? ` (${errors.length} skipped)` : ''}`,
+  });
 });
 
 // ==========================================

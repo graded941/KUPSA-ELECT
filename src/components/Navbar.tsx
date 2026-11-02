@@ -11,7 +11,8 @@ import {
   Scale,
   LifeBuoy,
   Briefcase,
-  ChevronRight
+  ChevronRight,
+  Lock
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -32,7 +33,7 @@ const NAV_ITEMS: { id: ViewId; label: string; icon: React.ComponentType<{ classN
 
 export function Navbar({ currentView, onNavigate, currentPhase }: NavbarProps) {
   const [open, setOpen] = useState(false);
-  const { isResultsLive } = useVotingStore();
+  const { isResultsLive, isPollsOpen } = useVotingStore();
 
   const handleNav = (view: ViewId) => {
     onNavigate(view);
@@ -110,14 +111,16 @@ export function Navbar({ currentView, onNavigate, currentPhase }: NavbarProps) {
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => handleNav('portal')}
-            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all shadow-xs ${
+            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all shadow-xs cursor-pointer ${
               isActive('portal')
                 ? 'bg-primary text-primary-foreground shadow-pop'
+                : !isPollsOpen
+                ? 'bg-amber-600/90 text-white hover:bg-amber-700'
                 : 'bg-ink text-ink-foreground hover:bg-primary'
             }`}
           >
-            <Vote className="h-4 w-4" />
-            <span>Vote</span>
+            {isPollsOpen ? <Vote className="h-4 w-4" /> : <Lock className="h-4 w-4 text-amber-200" />}
+            <span>{isPollsOpen ? 'Vote' : 'Polls Locked'}</span>
           </button>
 
           {/* Mobile Menu Button */}

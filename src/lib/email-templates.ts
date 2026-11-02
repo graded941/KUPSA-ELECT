@@ -53,8 +53,8 @@ export function renderVoterPassEmailHtml(data: RenderVoterPassOptions): string {
     reservationFor: {
       '@type': 'Event',
       name: 'KUPSA General Elections 2026/2027',
-      startDate: '2026-11-06T08:00:00+03:00',
-      endDate: '2026-11-06T17:00:00+03:00',
+      startDate: '2026-11-06T06:00:00+03:00',
+      endDate: '2026-11-06T16:00:00+03:00',
       location: {
         '@type': 'Place',
         name: data.pollingStation,

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { SHARED_OFFICES, SHARED_CANDIDATES } from '../data/candidateData';
-import { isValidPharmacyRegNo, getExpectedYearOfStudy } from '../lib/utils';
+import { isValidPharmacyRegNo, isYearOfStudyAligned } from '../lib/utils';
 import {
   fetchLiveElectionState,
   castSecretBallotApi,
@@ -18,6 +18,10 @@ import {
   DbVoter,
   DbBallot,
   ConnectionStatus,
+  bulkImportVotersApi,
+  BulkImportStudentItem,
+  BulkImportResponse,
+  deleteVoterApi,
 } from '../lib/electionService';
 
 export interface VoterUser {
@@ -95,6 +99,10 @@ interface VotingStoreContextType {
   isResultsLive: boolean;
   setIsResultsLive: (val: boolean) => void;
 
+  // Polls Open / Lock Control
+  isPollsOpen: boolean;
+  setIsPollsOpen: (val: boolean) => Promise<void>;
+
   // Election Phase & Broadcast Notice Control
   electionPhase: 'pre-election' | 'polling-live' | 'counting' | 'results-declared';
   setElectionPhase: (phase: 'pre-election' | 'polling-live' | 'counting' | 'results-declared') => void;
@@ -120,6 +128,12 @@ interface VotingStoreContextType {
   toggleAccreditation: (regNo: string) => void;
   resetUserVoteStatus: (email: string) => void;
   purgeVoters: () => Promise<{ success: boolean; message?: string; error?: string }>;
+  deleteVoter: (regNo: string, email?: string) => Promise<void>;
+  bulkImportVoters: (
+    students: BulkImportStudentItem[],
+    officerEmail?: string,
+    officerRole?: string
+  ) => Promise<BulkImportResponse>;
 
   // Auth actions
   signUp: (name: string, email: string, yearOfStudy: string, regNo?: string) => Promise<{ success: boolean; error?: string; password?: string; user?: VoterUser }>;
@@ -153,6 +167,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // Settings (Default isResultsLive is false / embargoed until toggled live by commission)
   const [isResultsLive, setIsResultsLiveState] = useState<boolean>(false);
+  const [isPollsOpen, setIsPollsOpenState] = useState<boolean>(true);
   const [electionPhase, setElectionPhaseState] = useState<'pre-election' | 'polling-live' | 'counting' | 'results-declared'>('polling-live');
   const [announcementBanner, setAnnouncementBannerState] = useState<string>('');
 
@@ -219,6 +234,10 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setIsResultsLiveState(Boolean(state.settings.is_results_live));
         if (state.settings.election_phase) {
           setElectionPhaseState(state.settings.election_phase);
+          setIsPollsOpenState(state.settings.election_phase === 'polling-live');
+        }
+        if (state.settings.is_polls_open !== undefined) {
+          setIsPollsOpenState(Boolean(state.settings.is_polls_open));
         }
         if (state.settings.announcement_banner !== undefined) {
           setAnnouncementBannerState(state.settings.announcement_banner || '');
@@ -450,6 +469,19 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
+  // Setter wrapper for Polls Open / Lock (syncs to server and database)
+  const setIsPollsOpen = async (val: boolean) => {
+    setIsPollsOpenState(val);
+    const targetPhase = val ? 'polling-live' : 'counting';
+    setElectionPhaseState(targetPhase);
+    try {
+      await updateElectionSettingsApi({ isPollsOpen: val, electionPhase: targetPhase });
+      await refreshDbState();
+    } catch (err) {
+      console.error('Failed to sync isPollsOpen to server:', err);
+    }
+  };
+
   // Setter wrapper for Election Phase (syncs to Supabase & broadcast to all devices)
   const setElectionPhase = async (phase: 'pre-election' | 'polling-live' | 'counting' | 'results-declared') => {
     setElectionPhaseState(phase);
@@ -581,11 +613,10 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
       };
     }
 
-    const expectedYear = getExpectedYearOfStudy(cleanRegNo);
-    if (!expectedYear || yearOfStudy !== expectedYear) {
+    if (!isYearOfStudyAligned(cleanRegNo, yearOfStudy)) {
       return {
         success: false,
-        error: `Year of study mismatch: Registration number corresponds to ${expectedYear || 'a different cohort'}. Account cannot be created.`,
+        error: 'Year of study does not align with your cohort year based on registration number. Account cannot be created.',
       };
     }
 
@@ -625,7 +656,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
         subject: 'Your Official KUPSA Election Portal Password · Election Date: 6th Nov 2026',
         password: serverPin,
         sentAt: 'Just now',
-        electionDate: 'Friday, 6th November 2026 (08:00 – 17:00 EAT)',
+        electionDate: 'Friday, 6th November 2026 (06:00 – 16:00 EAT)',
       };
 
       setUsers((prev) => [newUser, ...prev.filter((u) => u.email.toLowerCase() !== cleanEmail)]);
@@ -737,6 +768,10 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
       throw new Error('Voter authentication session required.');
     }
 
+    if (!isPollsOpen) {
+      throw new Error('Polls are currently locked by the Electoral Commission. Official polling hours: 6:00 AM – 4:00 PM (16:00 EAT).');
+    }
+
     // Call server to write anonymized ballot into DB and mark voter completed
     const result = await castSecretBallotApi({
       email: currentUser.email,
@@ -826,7 +861,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
         subject: 'Your Official KUPSA Election Portal Password (Resent) · Election Date: 6th Nov 2026',
         password: activePin,
         sentAt: 'Just now',
-        electionDate: 'Friday, 6th November 2026 (08:00 – 17:00 EAT)',
+        electionDate: 'Friday, 6th November 2026 (06:00 – 16:00 EAT)',
       };
 
       setSimulatedEmails((prev) => [updatedEmail, ...prev.filter((e) => e.recipientEmail !== clean)]);
@@ -843,7 +878,7 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
           subject: 'Your Official KUPSA Election Portal Password (Resent) · Election Date: 6th Nov 2026',
           password: user.password,
           sentAt: 'Just now',
-          electionDate: 'Friday, 6th November 2026 (08:00 – 17:00 EAT)',
+          electionDate: 'Friday, 6th November 2026 (06:00 – 16:00 EAT)',
         };
         setSimulatedEmails((prev) => [updatedEmail, ...prev.filter((e) => e.recipientEmail !== user.email)]);
         return { success: true, message: 'PIN resent.' };
@@ -877,6 +912,69 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
+  const bulkImportVoters = async (
+    students: BulkImportStudentItem[],
+    officerEmail?: string,
+    officerRole?: string
+  ): Promise<BulkImportResponse> => {
+    try {
+      const res = await bulkImportVotersApi(students, officerEmail, officerRole);
+      await refreshDbState();
+      return res;
+    } catch (err: any) {
+      console.error('Bulk import error:', err);
+      // Offline fallback: update local state so system remains fully testable offline
+      const newAccreditation: StudentAccreditationRecord[] = students.map((s) => ({
+        regNo: s.regNo,
+        name: s.name,
+        email: s.email,
+        yearOfStudy: s.yearOfStudy,
+        status: (s.status as any) || 'Eligible',
+        reason: 'Imported via official student roster',
+        hasVoted: false,
+      }));
+
+      setAccreditationList((prev) => {
+        const existingEmails = new Set(prev.map((p) => p.email.toLowerCase()));
+        const additions = newAccreditation.filter((a) => !existingEmails.has(a.email.toLowerCase()));
+        return [...additions, ...prev];
+      });
+
+      return {
+        success: true,
+        importedCount: students.length,
+        updatedCount: 0,
+        totalReceived: students.length,
+        errors: [],
+        message: `Offline mode: ${students.length} students loaded into session register.`,
+      };
+    }
+  };
+
+  const deleteVoter = async (regNo: string, email?: string) => {
+    try {
+      await deleteVoterApi({ regNo, email });
+    } catch (err) {
+      console.warn('API delete voter warning:', err);
+    }
+
+    setAccreditationList((prev) =>
+      prev.filter(
+        (s) =>
+          s.regNo.toUpperCase() !== regNo.toUpperCase() &&
+          (!email || s.email.toLowerCase() !== email.toLowerCase())
+      )
+    );
+    setUsers((prev) =>
+      prev.filter(
+        (u) =>
+          u.regNo?.toUpperCase() !== regNo.toUpperCase() &&
+          (!email || u.email.toLowerCase() !== email.toLowerCase())
+      )
+    );
+    await refreshDbState();
+  };
+
   const totalRegistered = useMemo(() => {
     return accreditationList.length;
   }, [accreditationList]);
@@ -901,6 +999,8 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
         dbCandidates,
         isResultsLive,
         setIsResultsLive,
+        isPollsOpen,
+        setIsPollsOpen,
         electionPhase,
         setElectionPhase,
         announcementBanner,
@@ -911,6 +1011,8 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
         toggleAccreditation,
         resetUserVoteStatus,
         purgeVoters,
+        deleteVoter,
+        bulkImportVoters,
         signUp,
         login,
         logout,

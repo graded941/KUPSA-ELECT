@@ -105,8 +105,8 @@ export function generateElectionCalendarInvite(params: {
   eventTitle: string;
   description: string;
   location: string;
-  startUtc: string; // e.g. "20261106T050000Z" (8:00 AM EAT)
-  endUtc: string;   // e.g. "20261106T140000Z" (5:00 PM EAT)
+  startUtc: string; // e.g. "20261106T030000Z" (6:00 AM EAT)
+  endUtc: string;   // e.g. "20261106T130000Z" (4:00 PM EAT)
 }): string {
   const nowUtc = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
   const uid = `kupsa-election-2026-${Date.now()}@kabarak.ac.ke`;
@@ -186,7 +186,7 @@ export async function generateVoterPassPdf(data: {
   doc.text(`Reg Number:  ${data.regNo}`, 12, 51);
   doc.text(`Cohort:      ${data.yearOfStudy}`, 12, 57);
   doc.text(`Voting Mode: Online Portal (100% Digital & Secret)`, 12, 63);
-  doc.text(`Poll Date:   Friday, 6 Nov 2026 (08:00 - 17:00 EAT)`, 12, 69);
+  doc.text(`Poll Date:   Friday, 6 Nov 2026 (06:00 - 16:00 EAT)`, 12, 69);
 
   // Secret Password Box
   doc.setFillColor(247, 246, 242);
@@ -271,8 +271,8 @@ export async function sendVoterPassEmail(payload: VoterPassPayload): Promise<{
       eventTitle: 'KUPSA General Elections 2026/2027 (Online Polling)',
       description: `Official student online polling for the Kabarak University Pharmacy Students Association. Cast your secret ballot on the portal: ${portalUrl}. Your Voter Passcode is: ${payload.passwordCode}.`,
       location: 'Official Online Portal · School of Pharmacy, Kabarak University',
-      startUtc: '20261106T050000Z', // 08:00 EAT (Friday, 6 Nov 2026)
-      endUtc: '20261106T140000Z',   // 17:00 EAT (Friday, 6 Nov 2026)
+      startUtc: '20261106T030000Z', // 06:00 EAT (Friday, 6 Nov 2026)
+      endUtc: '20261106T130000Z',   // 16:00 EAT (Friday, 6 Nov 2026)
     });
 
     // 3. Schema.org JSON-LD microdata for interactive card display in Gmail
@@ -288,8 +288,8 @@ export async function sendVoterPassEmail(payload: VoterPassPayload): Promise<{
       reservationFor: {
         '@type': 'Event',
         name: 'KUPSA General Elections 2026/2027',
-        startDate: '2026-11-06T08:00:00+03:00',
-        endDate: '2026-11-06T17:00:00+03:00',
+        startDate: '2026-11-06T06:00:00+03:00',
+        endDate: '2026-11-06T16:00:00+03:00',
         eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
         location: {
           '@type': 'VirtualLocation',
@@ -369,7 +369,7 @@ export async function sendVoterPassEmail(payload: VoterPassPayload): Promise<{
         </tr>
         <tr>
           <td class="details-label">Polling Schedule:</td>
-          <td class="details-val">Friday, 6 Nov 2026 · 08:00 – 17:00 EAT</td>
+          <td class="details-val">Friday, 6 Nov 2026 · 06:00 – 16:00 EAT (6:00 AM – 4:00 PM)</td>
         </tr>
       </table>
 
@@ -411,7 +411,7 @@ export async function sendVoterPassEmail(payload: VoterPassPayload): Promise<{
       `Reg Number:       ${payload.regNo}`,
       `Academic Cohort:  ${payload.yearOfStudy}`,
       `Voting Channel:   Official Online Portal (100% Digital & Secret)`,
-      `Polling Schedule: Friday, 6 November 2026 · 08:00 to 17:00 EAT`,
+      `Polling Schedule: Friday, 6 November 2026 · 06:00 to 16:00 EAT (6:00 AM – 4:00 PM)`,
       '',
       '------------------------------------------------------------',
       'YOUR SECRET ONE-TIME VOTING PASSCODE',

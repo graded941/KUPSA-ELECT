@@ -83,7 +83,7 @@ const ARTICLES = [
 
 export function OverviewView({ onNavigate, onOpenAudit, onOpenRehearsal, currentPhase }: OverviewViewProps) {
   const [openArticle, setOpenArticle] = useState<number | null>(39);
-  const { isResultsLive, votes } = useVotingStore();
+  const { isResultsLive, isPollsOpen, votes } = useVotingStore();
 
   const dynamicSteps = [
     {
@@ -105,17 +105,19 @@ export function OverviewView({ onNavigate, onOpenAudit, onOpenRehearsal, current
     {
       icon: Vote,
       title: 'Cast a secret ballot',
-      body: 'Nobody — not even the Commission — can link your cast ballot back to your identity.',
+      body: isPollsOpen
+        ? 'Nobody — not even the Commission — can link your cast ballot back to your identity.'
+        : 'Polls are currently locked by the Commission. Scheduled polling runs from 6:00 AM to 4:00 PM.',
       target: 'portal' as ViewId,
-      ctaText: 'Voting Simulator',
-      badge: null,
+      ctaText: isPollsOpen ? 'Enter Ballot Portal' : 'View Poll Details',
+      badge: isPollsOpen ? 'POLLS OPEN' : 'POLLS LOCKED',
     },
     {
       icon: ShieldCheck,
       title: isResultsLive ? 'See live verified results' : 'See verified results',
       body: isResultsLive
         ? `Results are live! ${votes.length} secret ballots counted and certified across all School of Pharmacy offices.`
-        : 'Official tallies are sealed under Article 46 until polls close at 5:00 PM. Anonymous hashes verifiable anytime.',
+        : 'Official tallies are sealed under Article 46 until polls close at 4:00 PM (16:00 EAT). Anonymous hashes verifiable anytime.',
       target: 'results' as ViewId,
       ctaText: isResultsLive ? 'Inspect Live Tallies' : 'View Embargo Timer',
       badge: isResultsLive ? 'LIVE NOW' : 'EMBARGOED',
@@ -124,6 +126,27 @@ export function OverviewView({ onNavigate, onOpenAudit, onOpenRehearsal, current
 
   return (
     <div className="space-y-0">
+      {/* Polls Locked Notice Banner */}
+      {!isPollsOpen && (
+        <div className="bg-amber-600 text-white px-4 py-3 sm:px-6 shadow-sm border-b border-amber-700">
+          <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 text-xs sm:text-sm font-medium">
+              <Lock className="h-4 w-4 shrink-0" />
+              <span>
+                <strong>POLLS CURRENTLY LOCKED:</strong> Electronic voting is locked by the Commission. Polling hours: <strong>6:00 AM – 4:00 PM (16:00 EAT)</strong>.
+              </span>
+            </div>
+            <button
+              onClick={() => onNavigate('candidates')}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-50 transition-colors shadow-xs cursor-pointer"
+            >
+              <span>Inspect Candidates</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Dynamic Results Status Notice Banner across all devices */}
       {isResultsLive && (
         <div className="bg-emerald-600 text-white px-4 py-3 sm:px-6 shadow-sm border-b border-emerald-700">

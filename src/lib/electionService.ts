@@ -8,6 +8,7 @@ export interface DbElectionSettings {
   is_results_live: boolean;
   election_phase: 'pre-election' | 'polling-live' | 'counting' | 'results-declared';
   announcement_banner: string;
+  is_polls_open?: boolean;
   polls_open_at?: string | null;
   polls_close_at?: string | null;
   updated_at?: string;
@@ -179,6 +180,7 @@ export async function updateElectionSettingsApi(payload: {
   isResultsLive?: boolean;
   electionPhase?: 'pre-election' | 'polling-live' | 'counting' | 'results-declared';
   announcementBanner?: string;
+  isPollsOpen?: boolean;
   officerEmail?: string;
   officerRole?: string;
 }): Promise<{ success: boolean }> {
@@ -201,6 +203,10 @@ export async function updateElectionSettingsApi(payload: {
     if (typeof payload.isResultsLive === 'boolean') updatePayload.is_results_live = payload.isResultsLive;
     if (typeof payload.electionPhase === 'string') updatePayload.election_phase = payload.electionPhase;
     if (typeof payload.announcementBanner === 'string') updatePayload.announcement_banner = payload.announcementBanner;
+    if (typeof payload.isPollsOpen === 'boolean') {
+      updatePayload.is_polls_open = payload.isPollsOpen;
+      updatePayload.election_phase = payload.isPollsOpen ? 'polling-live' : 'counting';
+    }
 
     const { data: existing } = await supabase.from('election_settings').select('id').limit(1).maybeSingle();
     if (existing) {
@@ -690,6 +696,55 @@ export async function adjudicateConstitutionalPetition(payload: {
   } catch (err: any) {
     return { success: false, error: err.message };
   }
+}
+
+export interface BulkImportStudentItem {
+  regNo: string;
+  name: string;
+  email: string;
+  yearOfStudy: string;
+  status?: 'Eligible' | 'Action Required' | 'Ineligible';
+  password?: string;
+}
+
+export interface BulkImportResponse {
+  success: boolean;
+  importedCount: number;
+  updatedCount: number;
+  totalReceived: number;
+  errors: string[];
+  message: string;
+  voters?: DbVoter[];
+}
+
+export async function bulkImportVotersApi(
+  students: BulkImportStudentItem[],
+  officerEmail?: string,
+  officerRole?: string
+): Promise<BulkImportResponse> {
+  const res = await fetch('/api/admin/bulk-import-voters', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ students, officerEmail, officerRole }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to import student voter data');
+  }
+  return data;
+}
+
+export async function deleteVoterApi(payload: { regNo?: string; email?: string; id?: string }): Promise<{ success: boolean; message: string }> {
+  const res = await fetch('/api/admin/delete-voter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to delete student from voter roll');
+  }
+  return data;
 }
 
 

@@ -279,7 +279,7 @@ export function generateVoterAuthEmailHtml({
         </div>
         <div style="display: flex; justify-content: space-between;">
           <span style="color: #78716c; font-weight: 600;">Polling Window:</span>
-          <span style="color: #ea580c; font-weight: 700;">08:00 – 17:00 EAT (Article 41)</span>
+          <span style="color: #ea580c; font-weight: 700;">06:00 – 16:00 EAT (6:00 AM – 4:00 PM)</span>
         </div>
       </div>
 

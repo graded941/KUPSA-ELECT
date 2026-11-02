@@ -139,10 +139,10 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
   const turnoutCount = votes.length;
   const turnoutPercent = totalRegistered > 0 ? ((turnoutCount / totalRegistered) * 100).toFixed(1) : '0.0';
 
-  // Calculate target 5:00 PM (17:00 EAT) on Election Day
+  // Calculate target 4:00 PM (16:00 EAT) on Election Day
   const electionClosureDate = useMemo(() => {
     const d = getElectionPollingDate();
-    d.setHours(17, 0, 0, 0);
+    d.setHours(16, 0, 0, 0);
     return d;
   }, []);
 
@@ -204,7 +204,7 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
     return (
       <>
         <PageIntro eyebrow="Official Embargo · Article 46" title="Results Sealed Until Polls Close">
-          Official election counts are cryptographically sealed under Article 46. The Chief Returning Officer will declare and unseal the verified tallies at 5:00 PM on Election Day.
+          Official election counts are cryptographically sealed under Article 46. The Chief Returning Officer will declare and unseal the verified tallies at 4:00 PM on Election Day.
         </PageIntro>
 
         <div className="mx-auto max-w-4xl px-4 sm:px-6 py-12 sm:py-16">
@@ -221,7 +221,7 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
                 Public Results Unseal In
               </h2>
               <p className="mt-2 text-sm text-muted-foreground font-mono">
-                Official Declaration: Friday, 6th of November at 17:00 EAT (5:00 PM)
+                Official Declaration: Friday, 6th of November at 16:00 EAT (4:00 PM)
               </p>
             </div>
 
@@ -254,7 +254,7 @@ export function ResultsView({ onNavigate, onOpenAudit }: ResultsViewProps) {
                 <span>Statutory Article 46 Declaration Protocol</span>
               </div>
               <p>
-                In accordance with Chapter Six of the KUPSA Constitution, ballot boxes remain under the physical custody of the Staff Patron and Chief Returning Officer until general voting closes at 17:00 EAT.
+                In accordance with Chapter Six of the KUPSA Constitution, ballot boxes remain under the physical custody of the Staff Patron and Chief Returning Officer until general voting closes at 16:00 EAT (4:00 PM).
               </p>
               <p className="text-xs text-muted-foreground">
                 Counting occurs in the presence of certified candidate agents, independent faculty observers, and Dean of Pharmacy delegates. Certified tallies will appear here automatically upon declaration.

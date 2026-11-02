@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Settings,
   Lock,
+  Unlock,
   LogOut,
   ArrowRight,
   CheckCircle2,
@@ -28,9 +29,13 @@ import {
   Mail,
   Send,
   Database,
-  RefreshCw
+  RefreshCw,
+  FileSpreadsheet,
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { GmailBroadcastPanel } from './GmailBroadcastPanel';
+import { StudentDataImportModal } from './StudentDataImportModal';
 import { isSupabaseConfigured } from '../lib/supabaseClient';
 
 interface CommissionerDashboardViewProps {
@@ -89,6 +94,8 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
     totalRegistered,
     isResultsLive,
     setIsResultsLive,
+    isPollsOpen,
+    setIsPollsOpen,
     electionPhase,
     setElectionPhase,
     announcementBanner,
@@ -106,6 +113,8 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
     refreshDbState,
     resetAllBallots,
     purgeVoters,
+    deleteVoter,
+    bulkImportVoters,
     dbOffices,
     dbCandidates,
   } = useVotingStore();
@@ -113,6 +122,8 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
   const [isResettingBallots, setIsResettingBallots] = useState(false);
   const [isPurgingVoters, setIsPurgingVoters] = useState(false);
   const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importAlert, setImportAlert] = useState<string | null>(null);
 
   // Remember me option
   const [rememberMe, setRememberMe] = useState<boolean>(() => {
@@ -603,10 +614,14 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
         <div className="flex items-center gap-2">
           <span
             className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-              isResultsLive ? 'bg-emerald-500/20 text-emerald-700' : 'bg-amber-500/20 text-amber-800'
+              !isPollsOpen
+                ? 'bg-amber-500/20 text-amber-800'
+                : isResultsLive
+                ? 'bg-purple-500/20 text-purple-700'
+                : 'bg-emerald-500/20 text-emerald-700'
             }`}
           >
-            {isResultsLive ? 'RESULTS LIVE' : 'EMBARGOED'}
+            {!isPollsOpen ? 'POLLS LOCKED' : isResultsLive ? 'RESULTS LIVE' : 'POLLS OPEN'}
           </span>
           <button
             onClick={handleLogout}
@@ -670,7 +685,12 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
           <nav className="p-3 space-y-1">
             {[
               { id: 'overview', label: 'Executive Overview', icon: LayoutDashboard },
-              { id: 'results-control', label: 'Results & Embargo', icon: BarChart3, badge: isResultsLive ? 'LIVE' : 'EMBARGO' },
+              {
+                id: 'results-control',
+                label: 'Public Visibility & Polls',
+                icon: BarChart3,
+                badge: !isPollsOpen ? 'LOCKED' : isResultsLive ? 'LIVE' : 'OPEN',
+              },
               { id: 'controls', label: 'Editable Controls', icon: Settings },
               { id: 'voter-roll', label: 'Voter Roll & Registry', icon: Users },
               { id: 'candidates', label: 'Candidate Clearance', icon: ShieldCheck },
@@ -818,9 +838,9 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
               {/* Poll Window & Status */}
               <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
                 <span className="text-xs font-mono uppercase text-muted-foreground">Poll Window</span>
-                <div className="mt-2 font-display text-2xl font-bold text-foreground">Closes 17:00 EAT</div>
+                <div className="mt-2 font-display text-2xl font-bold text-foreground">Closes 16:00 EAT (4:00 PM)</div>
                 <p className="mt-1 text-[11px] font-mono text-muted-foreground">
-                  Status: {isResultsLive ? 'Results Live' : 'Embargoed until 5pm'}
+                  Status: {isPollsOpen ? 'Voting Open (6am–4pm)' : 'Polls Locked'} · {isResultsLive ? 'Results Live' : 'Embargoed'}
                 </p>
               </div>
             </div>
@@ -943,33 +963,118 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
           </div>
         )}
 
-        {/* TAB 2: RESULTS & EMBARGO CONTROL */}
+        {/* TAB 2: PUBLIC VISIBILITY & POLL LOCK CONTROL */}
         {activeTab === 'results-control' && (
           <div className="space-y-6 animate-in fade-in duration-200">
             <div className="border-b-2 border-border pb-4">
-              <span className="eyebrow text-primary">Public Visibility</span>
+              <span className="eyebrow text-primary">Public Visibility & Poll Operations</span>
               <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
-                Results Page Gazettement & Embargo Control
+                Public Visibility, Poll Lock & Gazettement Control
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Toggle public display of certified election tallies vs the constitutional 5:00 PM countdown embargo timer.
+                Manage live electronic balloting access (Lock / Open Polls) and public results publication embargo (6:00 AM – 4:00 PM statutory hours).
               </p>
             </div>
 
-            {/* The Live / Not Live Control Card */}
+            {/* CARD 1: POLLS LOCK & OPEN CONTROL */}
+            <div className="rounded-3xl border-2 border-ink bg-card p-6 sm:p-8 shadow-pop space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
+                <div>
+                  <span className="eyebrow text-muted-foreground">E-Balloting Access Control</span>
+                  <h3 className="font-display text-2xl font-bold text-foreground mt-0.5">
+                    Polls Status (Lock / Open)
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground max-w-md mt-1 leading-relaxed">
+                    Statutory voting schedule: <strong>6:00 AM to 4:00 PM (16:00 EAT)</strong>. When locked, students visiting the ballot portal will be unable to cast votes and will see the official locked notice.
+                  </p>
+                </div>
+
+                {/* Primary Polls Toggle Switch */}
+                <div className="flex items-center gap-3 self-start sm:self-auto">
+                  <span className="text-xs font-mono font-bold text-muted-foreground">
+                    {isPollsOpen ? 'POLLS OPEN' : 'POLLS LOCKED'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsPollsOpen(!isPollsOpen)}
+                    className={`relative inline-flex h-8 w-16 shrink-0 cursor-pointer rounded-full border-2 border-ink transition-colors duration-200 ease-in-out focus:outline-none ${
+                      isPollsOpen ? 'bg-emerald-600' : 'bg-amber-600'
+                    }`}
+                    title={isPollsOpen ? 'Click to lock the polls' : 'Click to open the polls'}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        isPollsOpen ? 'translate-x-8' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Polls Status Explanation Card */}
+              <div
+                className={`rounded-2xl border p-5 text-xs sm:text-sm leading-relaxed ${
+                  isPollsOpen
+                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-950'
+                    : 'border-amber-500/40 bg-amber-500/10 text-amber-950'
+                }`}
+              >
+                <div className="flex items-center gap-2 font-bold mb-1">
+                  {isPollsOpen ? (
+                    <Unlock className="h-4 w-4 text-emerald-700" />
+                  ) : (
+                    <Lock className="h-4 w-4 text-amber-800" />
+                  )}
+                  <span>
+                    Current Setting: {isPollsOpen ? 'Polls are OPEN (Voting Active)' : 'Polls are LOCKED (Voting Closed)'}
+                  </span>
+                </div>
+                <p>
+                  {isPollsOpen
+                    ? 'Accredited pharmacy scholars can currently access their digital secret ballots and submit votes. Statutory hours: 6:00 AM to 4:00 PM (16:00 EAT).'
+                    : 'Electronic balloting is locked by the Commission. Students accessing the ballot portal will see the official locked notification informing them that voting runs from 6:00 AM to 4:00 PM. No ballots can be submitted.'}
+                </p>
+              </div>
+
+              {/* Poll Actions */}
+              <div className="pt-2 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsPollsOpen(!isPollsOpen)}
+                  className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-semibold shadow-xs transition-colors cursor-pointer ${
+                    isPollsOpen
+                      ? 'bg-amber-600 text-white hover:bg-amber-700'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  }`}
+                >
+                  {isPollsOpen ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+                  <span>{isPollsOpen ? 'Lock Polls (Close Voting Session)' : 'Open Polls (Start Voting: 6:00 AM – 4:00 PM)'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('portal')}
+                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-5 py-2.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                >
+                  <span>Preview Student Ballot Portal</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* CARD 2: RESULTS EMBARGO CONTROL */}
             <div className="rounded-3xl border-2 border-ink bg-card p-6 sm:p-8 shadow-pop space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
                 <div>
                   <span className="eyebrow text-muted-foreground">Publication Status</span>
                   <h3 className="font-display text-2xl font-bold text-foreground mt-0.5">
-                    Public Results Display
+                    Public Results Display (Embargo Mode)
                   </h3>
                   <p className="text-xs sm:text-sm text-muted-foreground max-w-md mt-1 leading-relaxed">
-                    When set to <strong>Not Live (Embargoed)</strong>, any student visiting the Results tab will see the constitutional countdown timer to 5:00 PM on Election Day.
+                    When set to <strong>Not Live (Embargoed)</strong>, any student visiting the Results tab will see the constitutional countdown timer to 4:00 PM (16:00 EAT) on Election Day.
                   </p>
                 </div>
 
-                {/* Primary Toggle Switch */}
+                {/* Results Toggle Switch */}
                 <div className="flex items-center gap-3 self-start sm:self-auto">
                   <span className="text-xs font-mono font-bold text-muted-foreground">
                     {isResultsLive ? 'LIVE' : 'EMBARGOED'}
@@ -1008,7 +1113,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                 <p>
                   {isResultsLive
                     ? 'All students and observers visiting the Results page can currently inspect real-time candidate tallies and download official winner gazettement certificates.'
-                    : 'Students currently see the official embargo screen with an active countdown timer targeting 5:00 PM (17:00 EAT) on Election Day.'}
+                    : 'Students currently see the official embargo screen with an active countdown timer targeting 4:00 PM (16:00 EAT) on Election Day.'}
                 </p>
               </div>
 
@@ -1027,7 +1132,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   onClick={() => setIsResultsLive(!isResultsLive)}
                   className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-5 py-2.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors cursor-pointer"
                 >
-                  <span>Switch to {isResultsLive ? 'Embargo Mode (5pm Timer)' : 'Live Mode'}</span>
+                  <span>Switch to {isResultsLive ? 'Embargo Mode (4pm Timer)' : 'Live Mode'}</span>
                 </button>
                 <button
                   type="button"
@@ -1185,15 +1290,68 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
         {/* TAB 4: VOTER ROLL & ACCREDITATION */}
         {activeTab === 'voter-roll' && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            <div className="border-b-2 border-border pb-4">
-              <span className="eyebrow text-primary">Student Register</span>
-              <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
-                Voter Roll & Accreditation Registry
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Inspect registered pharmacy students, monitor ballot status, toggle accreditation eligibility, and reset voter accounts for testing.
-              </p>
+            <div className="border-b-2 border-border pb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <span className="eyebrow text-primary">Student Register</span>
+                <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
+                  Voter Roll & Accreditation Registry
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Inspect registered pharmacy students, monitor ballot status, toggle accreditation eligibility, and import official Excel student rosters.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-xs font-semibold text-ink-foreground shadow-xs hover:bg-primary transition-colors cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  <span>Import Excel / CSV Roster</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isPurgingVoters || accreditationList.length === 0}
+                  onClick={async () => {
+                    if (window.confirm('Are you sure you want to clear out ALL names from the voter registry? This will remove all students and test accounts. This cannot be undone.')) {
+                      setIsPurgingVoters(true);
+                      try {
+                        await purgeVoters();
+                        setImportAlert('All student names have been successfully cleared out from the registry.');
+                        setTimeout(() => setImportAlert(null), 6000);
+                      } catch (err: any) {
+                        alert(`Failed to clear registry: ${err.message || 'Server error'}`);
+                      } finally {
+                        setIsPurgingVoters(false);
+                      }
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs font-mono text-destructive hover:bg-destructive/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Clear out all student records from the voter database"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>{isPurgingVoters ? 'Clearing...' : 'Clear All Names'}</span>
+                </button>
+              </div>
             </div>
+
+            {importAlert && (
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs font-mono text-emerald-800 flex items-center justify-between animate-fade-in">
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span>{importAlert}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setImportAlert(null)}
+                  className="text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
 
             {/* Filter and Search Bar */}
             <div className="flex flex-col sm:flex-row gap-3">
@@ -1288,18 +1446,34 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                           </button>
                         </td>
                         <td className="p-3.5 text-right">
-                          {v.hasVoted ? (
+                          <div className="flex items-center justify-end gap-2">
+                            {v.hasVoted && (
+                              <button
+                                type="button"
+                                onClick={() => resetUserVoteStatus(v.email)}
+                                className="text-[11px] font-mono text-primary hover:underline cursor-pointer font-semibold"
+                                title="Allow student to vote again for prototype testing"
+                              >
+                                Reset Vote
+                              </button>
+                            )}
                             <button
                               type="button"
-                              onClick={() => resetUserVoteStatus(v.email)}
-                              className="text-[11px] font-mono text-primary hover:underline cursor-pointer font-semibold"
-                              title="Allow student to vote again for prototype testing"
+                              onClick={async () => {
+                                if (window.confirm(`Are you sure you want to remove ${v.name} (${v.regNo}) from the voter registry?`)) {
+                                  try {
+                                    await deleteVoter(v.regNo, v.email);
+                                  } catch (err: any) {
+                                    alert(`Failed to remove student: ${err.message || 'Server error'}`);
+                                  }
+                                }
+                              }}
+                              className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                              title="Delete this student from registry"
                             >
-                              Reset Vote State
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
-                          ) : (
-                            <span className="text-[11px] font-mono text-muted-foreground">—</span>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1650,6 +1824,23 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
           </div>
         )}
       </main>
+
+      {/* Excel / CSV Student Data Import Modal */}
+      <StudentDataImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImportSuccess={(res) => {
+          setImportAlert(`Successfully processed roster: ${res.importedCount} new students imported, ${res.updatedCount} updated.`);
+          setTimeout(() => setImportAlert(null), 8000);
+        }}
+        officerEmail={
+          officerName
+            ? `${officerName.toLowerCase().replace(/\s+/g, '.')}@kabarak.ac.ke`
+            : 'commissioner@kabarak.ac.ke'
+        }
+        officerRole={officerRole}
+        bulkImportFn={bulkImportVoters}
+      />
     </div>
   );
 }

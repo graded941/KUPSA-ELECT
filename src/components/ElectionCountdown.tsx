@@ -93,7 +93,7 @@ export function ElectionCountdown({ onNavigate }: ElectionCountdownProps) {
               Countdown to Election Phase
             </h3>
             <p className="text-xs font-mono text-muted-foreground mt-0.5">
-              Polling Day: <strong className="text-foreground">Friday, 6th November 2026</strong> (08:00 – 17:00 EAT) · Article 41(1)
+              Polling Day: <strong className="text-foreground">Friday, 6th November 2026</strong> (06:00 – 16:00 EAT · 6:00 AM to 4:00 PM) · Article 41(1)
             </p>
           </div>
         </div>

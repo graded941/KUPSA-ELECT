@@ -71,7 +71,7 @@ export const HowItWorksView: React.FC<HowItWorksViewProps> = ({ onNavigate }) =>
       num: 3,
       title: 'Voting Window Opens',
       shortTitle: '3. Voting',
-      timing: 'Friday, 6th Nov: 08:00 – 17:00 EAT',
+      timing: 'Friday, 6th Nov: 06:00 – 16:00 EAT (6:00 AM – 4:00 PM)',
       article: 'Articles 41 & 45',
       summary: 'On Friday, the 6th of November, authorized eligible students access the blinded digital ballot. Upon casting, a zero-knowledge token marks the student as having voted, while the ballot drops anonymously into an unlinked encrypted tally box.',
       allowed: [
@@ -94,16 +94,16 @@ export const HowItWorksView: React.FC<HowItWorksViewProps> = ({ onNavigate }) =>
       num: 4,
       title: 'Polls Close & Tallying',
       shortTitle: '4. Tallying',
-      timing: '17:00 EAT Promptly',
+      timing: '16:00 EAT Promptly (4:00 PM)',
       article: 'Articles 40 & 46',
-      summary: 'At exactly 17:00 EAT, the voting window seals automatically. Counting begins under the direct physical and cryptographic observation of all candidate agents and accredited observers.',
+      summary: 'At exactly 16:00 EAT (4:00 PM), the voting window seals automatically. Counting begins under the direct physical and cryptographic observation of all candidate agents and accredited observers.',
       allowed: [
         'Decrypt aggregated ballot box using multi-party threshold keys',
         'Tabulate candidate totals in real-time for accredited agents',
         'Record dissenting agent observations on Form EC-04'
       ],
       forbidden: [
-        'Introduce late ballots after statutory 17:00 EAT closure',
+        'Introduce late ballots after statutory 16:00 EAT closure',
         'Conduct counts in private or without accredited agent witnesses',
         'Manually adjust or invalidate ballots without formal agent signoff'
       ],

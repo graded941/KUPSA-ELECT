@@ -21,7 +21,12 @@ import {
   IdCard
 } from 'lucide-react';
 import { dispatchVoterPassEmail } from '../lib/electionService';
-import { isValidPharmacyRegNo, getExpectedYearOfStudy } from '../lib/utils';
+import {
+  isValidPharmacyRegNo,
+  getPrimaryCohortYear,
+  isYearOfStudyAligned,
+  getValidCohortYears,
+} from '../lib/utils';
 
 interface AuthViewProps {
   onNavigate: (view: ViewId) => void;
@@ -84,10 +89,9 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
     return isValidPharmacyRegNo(reg);
   };
 
-  const expectedCohortYear = isRegNoValid(regNo) ? getExpectedYearOfStudy(regNo) : null;
   const cohortMismatchError =
-    expectedCohortYear && yearOfStudy !== expectedCohortYear
-      ? `Year of study must align with your registration number cohort (${expectedCohortYear})`
+    isRegNoValid(regNo) && !isYearOfStudyAligned(regNo, yearOfStudy)
+      ? 'Year of study must align with your cohort year based on registration number'
       : null;
 
   const emailError =
@@ -118,14 +122,13 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
     }
 
     if (!isRegNoValid(regNo)) {
-      setSignupError('Please enter a valid student registration number');
+      setSignupError('Invalid registration number format. Account cannot be created.');
       return;
     }
 
-    const expectedYear = getExpectedYearOfStudy(regNo);
-    if (!expectedYear || yearOfStudy !== expectedYear) {
+    if (!isYearOfStudyAligned(regNo, yearOfStudy)) {
       setSignupError(
-        `Year of study mismatch: Registration number corresponds to ${expectedYear || 'a different cohort'}. Please select ${expectedYear} to create an account.`
+        'Year of study does not align with your cohort year based on registration number. Account cannot be created.'
       );
       return;
     }
@@ -312,7 +315,7 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                   </div>
                   <p className="text-xs text-emerald-800 dark:text-emerald-200 leading-relaxed">
                     Your single-token voter password, PDF passcard, and election calendar invite for{' '}
-                    <strong>Friday, 6th November 2026 (08:00 – 17:00 EAT)</strong> have been sent to{' '}
+                    <strong>Friday, 6th November 2026 (06:00 – 16:00 EAT)</strong> have been sent to{' '}
                     <strong className="font-mono underline">{registeredEmail}</strong> for accredited student{' '}
                     <strong className="font-mono bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-950 dark:text-emerald-100">{registeredRegNo}</strong>.
                   </p>
@@ -519,12 +522,15 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                           const val = e.target.value.toUpperCase();
                           setRegNo(val);
                           if (signupError) setSignupError(null);
-                          const derivedCohort = getExpectedYearOfStudy(val);
-                          if (derivedCohort) {
-                            setYearOfStudy(derivedCohort);
+                          if (isValidPharmacyRegNo(val)) {
+                            const valid = getValidCohortYears(val);
+                            if (!valid.includes(yearOfStudy)) {
+                              const primary = getPrimaryCohortYear(val);
+                              if (primary) setYearOfStudy(primary);
+                            }
                           }
                         }}
-                        placeholder="Enter registration number"
+                        placeholder=""
                         className={`w-full rounded-xl border py-2.5 pl-10 pr-3 text-sm font-mono uppercase text-foreground placeholder:text-muted-foreground outline-none transition-all ${
                           regNoError
                             ? 'border-destructive bg-destructive/5 focus:border-destructive'
@@ -572,16 +578,9 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
 
                   {/* Year of Study */}
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-semibold text-foreground">
-                        Year of Study
-                      </label>
-                      {expectedCohortYear && (
-                        <span className="text-[10px] font-mono text-primary font-semibold bg-primary/10 px-2 py-0.5 rounded-full">
-                          Aligned to {expectedCohortYear}
-                        </span>
-                      )}
-                    </div>
+                    <label className="block text-xs font-semibold text-foreground mb-1">
+                      Year of Study
+                    </label>
                     <div className="relative">
                       <GraduationCap className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
                       <select
@@ -596,12 +595,12 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
                             : 'border-border bg-background'
                         }`}
                       >
-                        <option value="Year 1">Year 1 (Freshman)</option>
-                        <option value="Year 2">Year 2 (Sophomore)</option>
-                        <option value="Year 3">Year 3 (Junior)</option>
-                        <option value="Year 4">Year 4 (Senior)</option>
-                        <option value="Year 5">Year 5 (Clinical Intern)</option>
-                        <option value="Masters">Masters (Postgraduate)</option>
+                        <option value="Year 1">Year 1</option>
+                        <option value="Year 2">Year 2</option>
+                        <option value="Year 3">Year 3</option>
+                        <option value="Year 4">Year 4</option>
+                        <option value="Year 5">Year 5</option>
+                        <option value="Masters">Masters</option>
                       </select>
                     </div>
                     {cohortMismatchError && (
@@ -677,20 +676,9 @@ export function AuthView({ onNavigate, defaultMode = 'signup' }: AuthViewProps) 
 
                   {/* Password with Show/Hide toggle */}
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-semibold text-foreground">
-                        Account Password
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMode('signup');
-                        }}
-                        className="text-[11px] text-primary hover:underline"
-                      >
-                        Need password? Sign up
-                      </button>
-                    </div>
+                    <label className="block text-xs font-semibold text-foreground mb-1">
+                      Account Password
+                    </label>
                     <div className="relative">
                       <Lock className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
                       <input

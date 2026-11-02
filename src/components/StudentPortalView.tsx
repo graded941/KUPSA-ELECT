@@ -205,7 +205,7 @@ export function StudentPortalView({ onNavigate }: StudentPortalViewProps) {
                     id="reg"
                     value={regNo}
                     onChange={(e) => setRegNo(e.target.value)}
-                    placeholder="PHAM/M/0000/00/00"
+                    placeholder=""
                     className="flex-1 rounded-xl border-2 border-border bg-background px-4 py-3 font-mono text-base uppercase outline-none focus:border-ink"
                     required
                   />

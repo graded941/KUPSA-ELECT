@@ -82,7 +82,7 @@ export function GmailBroadcastPanel() {
   // Commission Notice state
   const [noticeHeadline, setNoticeHeadline] = useState('Official Polling Station Check-in Directives');
   const [noticeBody, setNoticeBody] = useState(
-    'All accredited pharmacy scholars are notified that official online voting opens at 08:00 EAT for the School of Pharmacy, Kabarak University. Online e-balloting remains accessible 24/7 on this portal.'
+    'All accredited pharmacy scholars are notified that official online voting opens at 06:00 EAT (6:00 AM) and closes at 16:00 EAT (4:00 PM) for the School of Pharmacy, Kabarak University.'
   );
   const [noticeUrgency, setNoticeUrgency] = useState<'routine' | 'urgent' | 'critical'>('urgent');
   const [noticeRecipient, setNoticeRecipient] = useState('');

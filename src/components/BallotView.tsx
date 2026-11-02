@@ -28,7 +28,7 @@ interface BallotViewProps {
 }
 
 export function BallotView({ onNavigate }: BallotViewProps) {
-  const { currentUser, logout, castVote, dbOffices, dbCandidates, isLoadingDb } = useVotingStore();
+  const { currentUser, logout, castVote, dbOffices, dbCandidates, isLoadingDb, isPollsOpen } = useVotingStore();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // If no user is logged in, redirect to auth
@@ -179,6 +179,95 @@ export function BallotView({ onNavigate }: BallotViewProps) {
   // If user is not yet loaded, show nothing or spinner
   if (!currentUser) {
     return null;
+  }
+
+  // SCREEN: POLLS LOCKED BY COMMISSION
+  if (!isPollsOpen) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col justify-between">
+        <header className="border-b border-border bg-card px-4 sm:px-8 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img
+              src="/kupsa-logo.png"
+              alt="KUPSA"
+              className="h-8 w-8 rounded-full object-contain"
+              onError={(e) => {
+                (e.currentTarget as HTMLElement).style.display = 'none';
+              }}
+            />
+            <span className="font-display text-lg font-bold text-foreground">
+              KUPSA Elections · 2026
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              logout();
+              onNavigate('overview');
+            }}
+            className="inline-flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-foreground py-1.5 px-3 rounded-lg border border-border hover:bg-secondary transition-colors cursor-pointer"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            <span>Logout</span>
+          </button>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
+          <div className="w-full max-w-lg rounded-3xl border-2 border-border bg-card p-6 sm:p-10 shadow-card text-center space-y-6 animate-in fade-in duration-300">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 ring-8 ring-amber-500/5">
+              <Lock className="h-10 w-10" />
+            </div>
+
+            <div className="space-y-2">
+              <span className="inline-block text-[11px] font-mono font-bold uppercase tracking-wider text-amber-700 bg-amber-500/15 px-3 py-1 rounded-full">
+                Polls Currently Locked
+              </span>
+              <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
+                Voting Window Is Closed
+              </h2>
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                The KUPSA Electoral Commission has locked electronic balloting. Official polling hours are from <strong className="text-foreground">6:00 AM to 4:00 PM (16:00 EAT)</strong>. Ballots cannot be submitted while the polls are locked.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-secondary/40 p-4 text-left text-xs space-y-2">
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Accredited Student:</span>
+                <span className="font-semibold text-foreground">{currentUser.name}</span>
+              </div>
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Reg Number:</span>
+                <span className="font-mono font-semibold text-foreground">{currentUser.regNo || 'Accredited'}</span>
+              </div>
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Status:</span>
+                <span className="font-mono text-amber-700 font-bold">Balloting Locked · Standby</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => onNavigate('candidates')}
+                className="flex-1 rounded-xl bg-ink py-2.5 px-4 text-xs font-semibold text-ink-foreground shadow-xs hover:bg-primary transition-colors cursor-pointer"
+              >
+                Inspect Cleared Candidates
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate('overview')}
+                className="flex-1 rounded-xl border border-border bg-card py-2.5 px-4 text-xs font-semibold text-foreground hover:bg-secondary transition-colors cursor-pointer"
+              >
+                Return to Overview
+              </button>
+            </div>
+          </div>
+        </main>
+
+        <footer className="border-t border-border bg-card py-4 text-center text-xs text-muted-foreground">
+          KUPSA Independent Electoral Commission · Chapter Six Statutory Mandate
+        </footer>
+      </div>
+    );
   }
 
   // SCREEN F: ALREADY VOTED STATE

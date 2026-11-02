@@ -9,13 +9,13 @@ import { ElectionMilestone } from '../types';
  */
 export function getElectionPollingDate(referenceDate: Date = new Date()): Date {
   const currentYear = referenceDate.getFullYear();
-  // Fixed constitutional election date: Friday, 6th of November 2026 at 08:00 EAT (Article 41(1))
-  const targetDate = new Date(currentYear, 10, 6, 8, 0, 0, 0);
+  // Fixed constitutional election date: Friday, 6th of November 2026 at 06:00 EAT (Article 41(1))
+  const targetDate = new Date(currentYear, 10, 6, 6, 0, 0, 0);
 
   // If the date in current year has already elapsed by more than 7 days, target next cycle
   if (referenceDate.getTime() > targetDate.getTime() + 1000 * 60 * 60 * 24 * 7) {
     const nextYear = currentYear + 1;
-    return new Date(nextYear, 10, 6, 8, 0, 0, 0);
+    return new Date(nextYear, 10, 6, 6, 0, 0, 0);
   }
 
   return targetDate;
@@ -27,7 +27,7 @@ export const ELECTION_MILESTONES: ElectionMilestone[] = [
     title: 'Candidate Vetting & Gazette Notice',
     phase: 'pre-election',
     dateStr: 'Oct 24, 2026',
-    timeStr: '17:00 EAT',
+    timeStr: '16:00 EAT',
     article: 'Article 43',
     description: 'Statutory clearance of all nominated candidates by the Electoral Commission and School Patron.',
     badge: 'Completed'
@@ -47,7 +47,7 @@ export const ELECTION_MILESTONES: ElectionMilestone[] = [
     title: 'Polling Stations Open (Election Day)',
     phase: 'polling-live',
     dateStr: 'Nov 06, 2026',
-    timeStr: '08:00 EAT',
+    timeStr: '06:00 EAT',
     article: 'Article 41(1)',
     description: 'In-person secret electronic and manual paper contingency balloting commences.',
     badge: 'Critical Milestone'
@@ -57,7 +57,7 @@ export const ELECTION_MILESTONES: ElectionMilestone[] = [
     title: 'Polls Close & Tallying Begins',
     phase: 'counting',
     dateStr: 'Nov 06, 2026',
-    timeStr: '17:00 EAT',
+    timeStr: '16:00 EAT',
     article: 'Article 45',
     description: 'Ballot boxes unsealed in presence of accredited candidate agents and independent observers.',
     badge: 'Scheduled'
