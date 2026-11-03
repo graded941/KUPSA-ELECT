@@ -31,7 +31,6 @@ import {
   Vote,
   ExternalLink
 } from 'lucide-react';
-import { HoverTransition } from './ui/hover-transition';
 
 interface CandidatesViewProps {
   onNavigate: (view: ViewId) => void;
@@ -62,15 +61,28 @@ const OFFICE_ONE_LINERS: Record<string, string> = {
 
 const SHORTLIST_STORAGE_KEY = 'kupsa_candidate_shortlist_v1';
 
-function CandidateDefaultCard({
+function CandidatePlacardCard({
   cand,
   office,
+  onClick,
 }: {
   cand: Candidate;
   office: typeof OFFICES[number] & { isContested?: boolean; isUnopposed?: boolean };
+  onClick: () => void;
 }) {
   return (
-    <article className="group relative flex h-full min-h-[420px] sm:min-h-[440px] flex-col justify-between overflow-hidden rounded-3xl p-6 text-white transition-all select-none shadow-card">
+    <article
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className="relative flex h-full min-h-[420px] sm:min-h-[440px] flex-col justify-between overflow-hidden rounded-3xl p-6 text-white border border-border/40 select-none shadow-card cursor-pointer"
+    >
       {/* Full Background Candidate Photo Covering the Whole Plack Card */}
       <div className="absolute inset-0 z-0 bg-[#286746]">
         {/* Giant Watermark Initials Fallback */}
@@ -85,7 +97,7 @@ function CandidateDefaultCard({
           <img
             src={cand.photoUrl}
             alt={cand.name}
-            className="absolute inset-0 z-10 h-full w-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-105"
+            className="absolute inset-0 z-10 h-full w-full object-cover object-top"
             loading="lazy"
             onError={(e) => {
               (e.currentTarget as HTMLElement).style.display = 'none';
@@ -121,71 +133,7 @@ function CandidateDefaultCard({
         </h3>
         <div className="mt-1 flex items-center justify-between text-xs text-white/80 font-mono">
           <span>Candidate ID: {cand.id.toUpperCase()}</span>
-          <span className="text-[11px] text-white/60 group-hover:text-white transition-colors">Tap for dossier →</span>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function CandidateHoverCard({
-  cand,
-  office,
-}: {
-  cand: Candidate;
-  office: typeof OFFICES[number] & { isContested?: boolean; isUnopposed?: boolean };
-}) {
-  return (
-    <article className="relative flex h-full min-h-[420px] sm:min-h-[440px] flex-col justify-between overflow-hidden rounded-3xl p-6 text-white transition-all select-none shadow-pop">
-      {/* Full Background Candidate Photo Covering the Whole Plack Card */}
-      <div className="absolute inset-0 z-0 bg-[#286746]">
-        <div
-          className="absolute inset-0 flex items-center justify-center font-display text-8xl font-bold text-white/20 select-none pointer-events-none"
-          style={{ backgroundColor: cand.photoPlaceholderBg || '#286746' }}
-        >
-          {cand.initials}
-        </div>
-
-        {cand.photoUrl ? (
-          <img
-            src={cand.photoUrl}
-            alt={cand.name}
-            className="absolute inset-0 z-10 h-full w-full object-cover object-top scale-105 transition-transform duration-500 ease-out"
-            loading="lazy"
-            onError={(e) => {
-              (e.currentTarget as HTMLElement).style.display = 'none';
-            }}
-          />
-        ) : null}
-
-        {/* Multi-stage Scrim Overlay */}
-        <div className="absolute inset-0 z-20 bg-gradient-to-t from-black/95 via-black/50 to-black/40 pointer-events-none" />
-      </div>
-
-      {/* Top Row: Office Tag and Year */}
-      <div className="relative z-10 flex items-start justify-between gap-2">
-        <span className="rounded-full bg-primary/95 backdrop-blur-md px-3.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-primary-foreground border border-white/25 shadow-xs">
-          {office.title}
-        </span>
-        <span className="rounded-full bg-black/60 backdrop-blur-md px-2.5 py-1 font-mono text-[10px] text-white/90 border border-white/15">
-          {cand.yearOfStudy.replace('Bachelor of Pharmacy', 'B.Pharm')}
-        </span>
-      </div>
-
-      {/* Bottom Identity & CTA Block (Zero manifesto text on placard) */}
-      <div className="relative z-10 mt-auto pt-6 border-t border-white/20">
-        <h3 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight drop-shadow-md">
-          {cand.name}
-        </h3>
-        <p className="mt-0.5 text-xs text-white/80 font-mono">
-          Candidate ID: {cand.id.toUpperCase()}
-        </p>
-
-        <div className="mt-4 flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white text-black px-4 py-2 text-xs font-semibold shadow-md">
-            <span>View candidate dossier</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </span>
+          <span className="text-[11px] text-white/80">View dossier →</span>
         </div>
       </div>
     </article>
@@ -609,14 +557,10 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
 
                         return (
                           <div key={cand.id} className="flex flex-col">
-                            {/* Animated Wipe Pluck Card */}
-                            <HoverTransition
-                              effect="wipe"
-                              direction="right"
-                              duration={0.72}
-                              defaultComponent={<CandidateDefaultCard cand={cand} office={office} />}
-                              hoverComponent={<CandidateHoverCard cand={cand} office={office} />}
-                              className="w-full min-h-[410px] rounded-3xl shadow-card"
+                            {/* Simple Candidate Plack Card (no hover transition animation) */}
+                            <CandidatePlacardCard
+                              cand={cand}
+                              office={office}
                               onClick={() => {
                                 setPickedCandidate(cand);
                                 setActiveTab('manifesto');

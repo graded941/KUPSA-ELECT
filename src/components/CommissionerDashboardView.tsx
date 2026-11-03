@@ -1687,7 +1687,7 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   <div
                     key={cand.id}
                     onClick={() => handleSelectCandidate(cand.id)}
-                    className={`relative overflow-hidden rounded-2xl border min-h-[160px] p-4 flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.01] ${
+                    className={`relative overflow-hidden rounded-2xl border min-h-[160px] p-4 flex flex-col justify-between cursor-pointer ${
                       selectedCandidateId === cand.id
                         ? 'border-primary ring-4 ring-primary/30 shadow-pop'
                         : 'border-border shadow-xs hover:border-ink'

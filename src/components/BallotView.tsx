@@ -603,12 +603,12 @@ export function BallotView({ onNavigate }: BallotViewProps) {
                               handleSelect(office.id, cand.id);
                             }
                           }}
-                          className={`group relative flex flex-col justify-between overflow-hidden rounded-3xl border-2 min-h-[380px] sm:min-h-[420px] text-left cursor-pointer transition-all duration-300 select-none ${
+                          className={`group relative flex flex-col justify-between overflow-hidden rounded-3xl border-2 min-h-[380px] sm:min-h-[420px] text-left cursor-pointer select-none ${
                             isSelected
-                              ? 'border-primary ring-4 ring-primary/30 shadow-pop scale-[1.01]'
+                              ? 'border-primary ring-4 ring-primary/30 shadow-pop'
                               : isDimmed
                               ? 'border-border opacity-65 hover:opacity-100 hover:border-ink/60'
-                              : 'border-border shadow-card hover:border-ink hover:shadow-pop hover:-translate-y-1'
+                              : 'border-border shadow-card hover:border-ink'
                           }`}
                         >
                           {/* Full Background Candidate Image / Portrait Pluck */}
@@ -625,7 +625,7 @@ export function BallotView({ onNavigate }: BallotViewProps) {
                               <img
                                 src={cand.photoUrl}
                                 alt={cand.name}
-                                className="absolute inset-0 z-10 h-full w-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-105"
+                                className="absolute inset-0 z-10 h-full w-full object-cover object-top"
                                 loading="lazy"
                                 onError={(e) => {
                                   (e.currentTarget as HTMLElement).style.display = 'none';
@@ -661,8 +661,8 @@ export function BallotView({ onNavigate }: BallotViewProps) {
                             </div>
                           </div>
 
-                          {/* Bottom Pluck Card Hover Transition: Name of Candidate & Details */}
-                          <div className="relative z-10 bg-gradient-to-t from-black/90 via-black/80 to-transparent p-5 pt-8 transition-all duration-300 ease-out">
+                          {/* Bottom Card Identity: Name of Candidate & Details */}
+                          <div className="relative z-10 bg-gradient-to-t from-black/90 via-black/80 to-transparent p-5 pt-8">
                             {/* Candidate Name Banner */}
                             <div className="flex items-end justify-between gap-2">
                               <div>
