@@ -93,12 +93,15 @@ function CandidatePlacardCard({
           {cand.initials}
         </div>
 
-        {cand.photoUrl ? (
+        {cand.photoUrl && !cand.photoUrl.startsWith('/candidates/') ? (
           <img
+            key={`${cand.id}-${cand.photoUrl.substring(0, 30)}`}
             src={cand.photoUrl}
             alt={cand.name}
             className="absolute inset-0 z-10 h-full w-full object-cover object-top"
-            loading="lazy"
+            onLoad={(e) => {
+              (e.currentTarget as HTMLElement).style.display = 'block';
+            }}
             onError={(e) => {
               (e.currentTarget as HTMLElement).style.display = 'none';
             }}
@@ -152,10 +155,17 @@ export function CandidatesView({ onNavigate, currentPhase = 'pre-election' }: Ca
       const vettingStatus: Candidate['vettingStatus'] =
         rawStatus === 'Cleared & Certified' ? 'Vetted & Approved' : (rawStatus as Candidate['vettingStatus']);
 
+      const resolvedPhotoUrl =
+        clearance?.photoUrl && !clearance.photoUrl.startsWith('/candidates/')
+          ? clearance.photoUrl
+          : dbMatch?.photo_url && !dbMatch.photo_url.startsWith('/candidates/')
+          ? dbMatch.photo_url
+          : clearance?.photoUrl || dbMatch?.photo_url || baseCand.photoUrl;
+
       return {
         ...baseCand,
         name: clearance?.name || dbMatch?.name || baseCand.name,
-        photoUrl: clearance?.photoUrl || dbMatch?.photo_url || baseCand.photoUrl,
+        photoUrl: resolvedPhotoUrl,
         manifestoSummary: clearance?.manifestoSummary || dbMatch?.manifesto_summary || baseCand.manifestoSummary,
         manifestoPillars: clearance?.manifestoPillars || baseCand.manifestoPillars,
         vettingStatus,

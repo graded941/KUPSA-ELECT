@@ -161,7 +161,13 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // Entities synced with Supabase
   const [dbOffices, setDbOffices] = useState<DbOffice[]>([]);
-  const [dbCandidates, setDbCandidates] = useState<DbCandidate[]>([]);
+  const [dbCandidates, setDbCandidates] = useState<DbCandidate[]>(() => {
+    try {
+      const saved = localStorage.getItem('kupsa_db_candidates_cache');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
   const [votes, setVotes] = useState<CastVote[]>([]);
   const [lastCastVote, setLastCastVote] = useState<CastVote | null>(null);
 
@@ -257,13 +263,21 @@ export const VotingStoreProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setDbOffices(state.offices || []);
 
       // 3. Candidates & Clearances
-      setDbCandidates(state.candidates || []);
+      if (state.candidates && state.candidates.length > 0) {
+        setDbCandidates(state.candidates);
+        try {
+          localStorage.setItem('kupsa_db_candidates_cache', JSON.stringify(state.candidates));
+        } catch {}
+      }
       const clearanceMap: Record<string, CandidateClearanceRecord> = {};
       (state.candidates || []).forEach((c) => {
         clearanceMap[c.id] = {
           status: c.clearance_status || 'Cleared & Certified',
           notes: c.clearance_notes || 'Nomination cleared under Chapter Six rules.',
           updatedAt: c.created_at ? new Date(c.created_at).toLocaleTimeString() : 'Certified',
+          name: c.name,
+          photoUrl: c.photo_url || undefined,
+          manifestoSummary: c.manifesto_summary || undefined,
         };
       });
       setCandidateClearances(clearanceMap);
