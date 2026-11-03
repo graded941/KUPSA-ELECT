@@ -79,7 +79,26 @@ function recordResendDispatch(email: string): void {
 
 const app = express();
 
-app.use(express.json());
+// Increase JSON and URL-encoded payload limits to 50MB to support bulk student rosters and candidate assets
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Middleware to capture any body parser errors (e.g., PayloadTooLargeError, invalid JSON) and return clean JSON
+app.use((err: any, _req: Request, res: Response, next: express.NextFunction) => {
+  if (err?.type === 'entity.too.large' || err?.status === 413) {
+    return res.status(413).json({
+      error: 'Upload payload is too large. Maximum supported payload size is 50MB.',
+      code: 'PAYLOAD_TOO_LARGE',
+    });
+  }
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({
+      error: 'Malformed JSON payload received.',
+      code: 'INVALID_JSON',
+    });
+  }
+  next(err);
+});
 
 // Enable permissive CORS for API requests
 app.use((req, res, next) => {
@@ -1696,7 +1715,7 @@ app.post('/api/admin/purge-voters', async (_req: Request, res: Response) => {
     voterPinStore.clear();
 
     if (supabaseAdmin) {
-      const { error: delErr } = await supabaseAdmin.from('voters').delete().not('id', 'is', null);
+      const { error: delErr } = await supabaseAdmin.from('voters').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       if (delErr) {
         console.error('Error deleting voters in Supabase:', delErr);
         throw delErr;
@@ -2286,6 +2305,24 @@ app.all(['/api/cron/process-outbox', '/api/cron/retry-outbox'], async (_req: Req
     success: true,
     processed,
     timestamp: new Date().toISOString(),
+  });
+});
+
+// 404 Catch-All for unmatched API routes to ensure they never return HTML
+app.all('/api/*', (_req: Request, res: Response) => {
+  return res.status(404).json({
+    error: 'API endpoint not found',
+    code: 'NOT_FOUND',
+  });
+});
+
+// Global Express Error Handler to guarantee JSON responses on all errors
+app.use((err: any, _req: Request, res: Response, _next: express.NextFunction) => {
+  console.error('[API Server Error]', err);
+  const status = typeof err.status === 'number' ? err.status : 500;
+  return res.status(status).json({
+    error: err.message || 'An unexpected internal server error occurred',
+    code: err.code || 'SERVER_ERROR',
   });
 });
 

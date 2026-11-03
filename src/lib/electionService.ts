@@ -78,12 +78,43 @@ export interface ElectionFullState {
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'error';
 
 /**
+ * Safely parse JSON from a fetch Response, guarding against HTML error responses
+ * and 413 Payload Too Large errors so they never trigger JSON syntax errors.
+ */
+export async function safeParseJson<T = any>(res: Response, defaultError = 'Request failed'): Promise<T> {
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    try {
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || defaultError);
+      }
+      return data;
+    } catch (err: any) {
+      if (!res.ok) throw new Error(err?.message || defaultError);
+      throw err;
+    }
+  }
+
+  // Handle HTML or non-JSON error pages (e.g. 413, 502, 500 HTML responses)
+  const rawText = await res.text().catch(() => '');
+  if (res.status === 413 || rawText.toLowerCase().includes('payload too large') || rawText.toLowerCase().includes('request entity too large')) {
+    throw new Error('Upload payload is too large. Please upload smaller files or batches.');
+  }
+  if (!res.ok) {
+    throw new Error(`Server returned HTTP ${res.status}: ${res.statusText || defaultError}`);
+  }
+  throw new Error(`Expected JSON response from server but received ${contentType || 'non-JSON content'}.`);
+}
+
+/**
  * Fetch complete live election state from server / database
  */
 export async function fetchLiveElectionState(): Promise<ElectionFullState> {
   try {
     const response = await fetch('/api/election/state');
-    if (response.ok) {
+    const ct = response.headers.get('content-type') || '';
+    if (response.ok && ct.includes('application/json')) {
       return await response.json();
     }
   } catch (err) {
@@ -174,11 +205,7 @@ export async function seedElectionDatabaseApi(): Promise<{
     body: JSON.stringify({ force: true }),
   });
 
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to seed database.');
-  }
-  return data;
+  return await safeParseJson(response, 'Failed to seed database.');
 }
 
 /**
@@ -199,7 +226,8 @@ export async function updateElectionSettingsApi(payload: {
       body: JSON.stringify(payload),
     });
 
-    if (response.ok) {
+    const ct = response.headers.get('content-type') || '';
+    if (response.ok && ct.includes('application/json')) {
       return await response.json();
     }
   } catch (err) {
@@ -251,11 +279,7 @@ export async function updateCandidateClearanceApi(payload: {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to update candidate record.');
-  }
-  return data;
+  return await safeParseJson(response, 'Failed to update candidate record.');
 }
 
 /**
@@ -275,11 +299,7 @@ export async function updateVoterAccreditationApi(payload: {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to modify voter accreditation.');
-  }
-  return data;
+  return await safeParseJson(response, 'Failed to modify voter accreditation.');
 }
 
 /**
@@ -303,11 +323,7 @@ export async function registerVoterApi(payload: {
     }),
   });
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to register student voter.');
-  }
-  return data;
+  return await safeParseJson(response, 'Failed to register student voter.');
 }
 
 /**
@@ -338,11 +354,7 @@ export async function loginVoterApi(payload: {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data.error || `Authentication failed (Server status: ${response.status})`);
-  }
-  return data;
+  return await safeParseJson(response, `Authentication failed (Server status: ${response.status})`);
 }
 
 /**
@@ -360,11 +372,7 @@ export async function resendVoterPinApi(email: string): Promise<{
     body: JSON.stringify({ email }),
   });
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to resend PIN.');
-  }
-  return data;
+  return await safeParseJson(response, 'Failed to resend PIN.');
 }
 
 /**
@@ -386,11 +394,7 @@ export async function resetAllBallotsApi(payload: {
     }),
   });
 
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to reset ballots.');
-  }
-  return data;
+  return await safeParseJson(response, 'Failed to reset ballots.');
 }
 
 /**
@@ -479,8 +483,7 @@ export async function fetchSmtpStatus(): Promise<{
 }> {
   try {
     const res = await fetch('/api/email/status');
-    if (!res.ok) throw new Error('Failed to fetch SMTP status');
-    return await res.json();
+    return await safeParseJson(res, 'Failed to fetch SMTP status');
   } catch (err: any) {
     return { configured: false };
   }
@@ -495,7 +498,7 @@ export async function triggerTestSmtp(): Promise<{
 }> {
   try {
     const res = await fetch('/api/email/test-smtp', { method: 'POST' });
-    return await res.json();
+    return await safeParseJson(res, 'SMTP test failed');
   } catch (err: any) {
     return { success: false, message: err.message || 'SMTP test failed' };
   }
@@ -515,7 +518,7 @@ export async function dispatchVoterPassEmail(payload: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return await res.json();
+    return await safeParseJson(res, 'Failed to dispatch email');
   } catch (err: any) {
     return { success: false, error: err.message };
   }
@@ -541,7 +544,7 @@ export async function dispatchResultsGazetteEmail(payload: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return await res.json();
+    return await safeParseJson(res, 'Failed to dispatch results email');
   } catch (err: any) {
     return { success: false, error: err.message };
   }
@@ -560,7 +563,7 @@ export async function dispatchNoticeEmail(payload: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return await res.json();
+    return await safeParseJson(res, 'Failed to dispatch commission notice');
   } catch (err: any) {
     return { success: false, error: err.message };
   }
@@ -733,16 +736,48 @@ export async function bulkImportVotersApi(
   officerEmail?: string,
   officerRole?: string
 ): Promise<BulkImportResponse> {
-  const res = await fetch('/api/admin/bulk-import-voters', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ students, officerEmail, officerRole }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to import student voter data');
+  const CHUNK_SIZE = 300;
+  if (students.length <= CHUNK_SIZE) {
+    const res = await fetch('/api/admin/bulk-import-voters', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ students, officerEmail, officerRole }),
+    });
+    return await safeParseJson<BulkImportResponse>(res, 'Failed to import student voter data');
   }
-  return data;
+
+  // Multi-chunk import for large rosters to prevent request timeouts and payload limits
+  let importedCount = 0;
+  let updatedCount = 0;
+  const errors: string[] = [];
+  const processedVoters: DbVoter[] = [];
+
+  for (let i = 0; i < students.length; i += CHUNK_SIZE) {
+    const chunk = students.slice(i, i + CHUNK_SIZE);
+    const res = await fetch('/api/admin/bulk-import-voters', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ students: chunk, officerEmail, officerRole }),
+    });
+    const chunkRes = await safeParseJson<BulkImportResponse>(
+      res,
+      `Failed to import batch ${Math.floor(i / CHUNK_SIZE) + 1}`
+    );
+    importedCount += chunkRes.importedCount || 0;
+    updatedCount += chunkRes.updatedCount || 0;
+    if (chunkRes.errors) errors.push(...chunkRes.errors);
+    if (chunkRes.voters) processedVoters.push(...chunkRes.voters);
+  }
+
+  return {
+    success: true,
+    importedCount,
+    updatedCount,
+    totalReceived: students.length,
+    errors,
+    message: `Batch import complete: ${importedCount} registered, ${updatedCount} updated.`,
+    voters: processedVoters,
+  };
 }
 
 export async function deleteVoterApi(payload: { regNo?: string; email?: string; id?: string }): Promise<{ success: boolean; message: string }> {
@@ -751,11 +786,7 @@ export async function deleteVoterApi(payload: { regNo?: string; email?: string; 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to delete student from voter roll');
-  }
-  return data;
+  return await safeParseJson<{ success: boolean; message: string }>(res, 'Failed to delete student from voter roll');
 }
 
 

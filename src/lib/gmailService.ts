@@ -210,10 +210,10 @@ export const sendEmailViaGmail = async (
       };
     }
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({ id: `gm-${Date.now()}` }));
     return {
       success: true,
-      messageId: data.id,
+      messageId: data.id || `gm-${Date.now()}`,
     };
   } catch (err: any) {
     console.error('Failed to send email via Gmail:', err);
