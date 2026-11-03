@@ -686,31 +686,22 @@ export function BallotView({ onNavigate }: BallotViewProps) {
                               )}
                             </div>
 
-                            {/* Smooth Hover Transition Drawer */}
-                            <div className="grid grid-rows-[0fr] group-hover:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-out">
-                              <div className="overflow-hidden">
-                                <div className="pt-3 border-t border-white/20 mt-3 space-y-2.5">
-                                  <p className="text-xs text-white/90 line-clamp-2 leading-relaxed">
-                                    "{cand.manifestoSummary}"
-                                  </p>
-                                  <div className="flex items-center justify-between pt-1">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setManifestoModalCandidate(cand);
-                                      }}
-                                      className="text-xs font-semibold text-sun hover:underline inline-flex items-center gap-1 cursor-pointer"
-                                    >
-                                      <span>View manifesto</span>
-                                      <ExternalLink className="h-3 w-3" />
-                                    </button>
-                                    <span className="text-[11px] font-mono text-white/70">
-                                      {isSelected ? 'Tap to deselect' : 'Tap to select'}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
+                            {/* Card Action & Selection Footer (Zero manifesto on placard) */}
+                            <div className="pt-3 border-t border-white/20 mt-3 flex items-center justify-between">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setManifestoModalCandidate(cand);
+                                }}
+                                className="text-xs font-semibold text-sun hover:underline inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>Candidate details</span>
+                                <ExternalLink className="h-3 w-3" />
+                              </button>
+                              <span className="text-[11px] font-mono text-white/80 font-medium">
+                                {isSelected ? 'Tap to deselect' : 'Tap to select'}
+                              </span>
                             </div>
                           </div>
                         </div>

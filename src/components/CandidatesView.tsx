@@ -70,63 +70,59 @@ function CandidateDefaultCard({
   office: typeof OFFICES[number] & { isContested?: boolean; isUnopposed?: boolean };
 }) {
   return (
-    <article className="relative flex h-full min-h-[400px] flex-col justify-between overflow-hidden bg-[#ece9e1] p-6 text-[#151515] transition-colors">
-      {/* Top Row: Office Tag and Year */}
-      <div className="relative z-10 flex items-start justify-between gap-3">
-        <div className="flex flex-col">
-          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-black/55 font-mono">
+    <article className="group relative flex h-full min-h-[420px] sm:min-h-[440px] flex-col justify-between overflow-hidden rounded-3xl p-6 text-white transition-all select-none shadow-card">
+      {/* Full Background Candidate Photo Covering the Whole Plack Card */}
+      <div className="absolute inset-0 z-0 bg-[#286746]">
+        {/* Giant Watermark Initials Fallback */}
+        <div
+          className="absolute inset-0 flex items-center justify-center font-display text-8xl font-bold text-white/20 select-none pointer-events-none"
+          style={{ backgroundColor: cand.photoPlaceholderBg || '#286746' }}
+        >
+          {cand.initials}
+        </div>
+
+        {cand.photoUrl ? (
+          <img
+            src={cand.photoUrl}
+            alt={cand.name}
+            className="absolute inset-0 z-10 h-full w-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-105"
+            loading="lazy"
+            onError={(e) => {
+              (e.currentTarget as HTMLElement).style.display = 'none';
+            }}
+          />
+        ) : null}
+
+        {/* Multi-stage Scrim Overlay for high-contrast legible typography */}
+        <div className="absolute inset-0 z-20 bg-gradient-to-t from-black/95 via-black/40 to-black/30 pointer-events-none" />
+      </div>
+
+      {/* Top Row: Office Tag and Year of Study */}
+      <div className="relative z-10 flex items-start justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="rounded-full bg-black/60 backdrop-blur-md px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-white border border-white/20 shadow-xs">
             {office.title}
           </span>
-          <span className="mt-0.5 text-[11px] font-mono text-black/50">
+          <span className="rounded-full bg-black/60 backdrop-blur-md px-2.5 py-1 font-mono text-[10px] text-white/90 border border-white/15 shadow-xs">
             {cand.yearOfStudy.replace('Bachelor of Pharmacy', 'B.Pharm')}
           </span>
         </div>
+        {office.isUnopposed && (
+          <span className="rounded-full bg-amber-500/90 backdrop-blur-md px-2.5 py-1 font-mono text-[10px] font-bold text-white border border-amber-400/30 shadow-xs">
+            Unopposed
+          </span>
+        )}
       </div>
 
-      {/* Giant Watermark Initials in the Background */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 grid place-items-center text-[7.5rem] sm:text-[9rem] font-semibold tracking-[-0.08em] text-black/[0.06] select-none pointer-events-none"
-      >
-        {cand.initials}
-      </div>
-
-      {/* Bottom Identity Block */}
-      <div className="relative z-10 mt-8">
-        <div className="flex items-center gap-3.5 mb-3">
-          <div className="relative h-14 w-14 overflow-hidden rounded-full ring-2 ring-black/15 ring-offset-2 ring-offset-[#ece9e1] shrink-0 shadow-xs">
-            <span
-              className="absolute inset-0 z-0 flex items-center justify-center font-display text-lg font-bold text-white shadow-xs"
-              style={{ backgroundColor: cand.photoPlaceholderBg || '#286746' }}
-            >
-              {cand.initials}
-            </span>
-            {cand.photoUrl ? (
-              <img
-                src={cand.photoUrl}
-                alt={cand.name}
-                className="absolute inset-0 z-10 h-full w-full object-cover"
-                loading="lazy"
-                onError={(e) => {
-                  (e.currentTarget as HTMLElement).style.display = 'none';
-                }}
-              />
-            ) : null}
-          </div>
-
-          <div>
-            <h3 className="text-2xl sm:text-3xl font-medium tracking-[-0.05em] text-[#151515] leading-tight">
-              {cand.name}
-            </h3>
-            <p className="text-xs text-black/55 font-mono">
-              Candidate ID: {cand.id.toUpperCase()}
-            </p>
-          </div>
+      {/* Bottom Identity Block (No manifesto text on placard) */}
+      <div className="relative z-10 mt-auto pt-8">
+        <h3 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight drop-shadow-md leading-tight">
+          {cand.name}
+        </h3>
+        <div className="mt-1 flex items-center justify-between text-xs text-white/80 font-mono">
+          <span>Candidate ID: {cand.id.toUpperCase()}</span>
+          <span className="text-[11px] text-white/60 group-hover:text-white transition-colors">Tap for dossier →</span>
         </div>
-
-        <p className="mt-2 text-sm text-black/65 line-clamp-2 leading-relaxed">
-          {cand.manifestoSummary}
-        </p>
       </div>
     </article>
   );
@@ -140,37 +136,54 @@ function CandidateHoverCard({
   office: typeof OFFICES[number] & { isContested?: boolean; isUnopposed?: boolean };
 }) {
   return (
-    <article className="flex h-full min-h-[400px] flex-col justify-between bg-[#dfff5f] p-6 text-[#111] transition-colors">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-black/60 font-mono">
-            {office.title} Platform
-          </span>
+    <article className="relative flex h-full min-h-[420px] sm:min-h-[440px] flex-col justify-between overflow-hidden rounded-3xl p-6 text-white transition-all select-none shadow-pop">
+      {/* Full Background Candidate Photo Covering the Whole Plack Card */}
+      <div className="absolute inset-0 z-0 bg-[#286746]">
+        <div
+          className="absolute inset-0 flex items-center justify-center font-display text-8xl font-bold text-white/20 select-none pointer-events-none"
+          style={{ backgroundColor: cand.photoPlaceholderBg || '#286746' }}
+        >
+          {cand.initials}
         </div>
 
-        <p className="max-w-[24ch] text-xl sm:text-2xl font-medium leading-tight tracking-[-0.035em] text-[#111]">
-          "{cand.manifestoSummary}"
-        </p>
+        {cand.photoUrl ? (
+          <img
+            src={cand.photoUrl}
+            alt={cand.name}
+            className="absolute inset-0 z-10 h-full w-full object-cover object-top scale-105 transition-transform duration-500 ease-out"
+            loading="lazy"
+            onError={(e) => {
+              (e.currentTarget as HTMLElement).style.display = 'none';
+            }}
+          />
+        ) : null}
 
-        {cand.manifestoPillars?.[0] && (
-          <div className="rounded-2xl bg-black/[0.08] p-3.5 text-xs text-black/85 leading-relaxed">
-            <span className="font-mono text-[10px] uppercase font-bold text-black/60 block mb-0.5">
-              Priority Promise 01
-            </span>
-            <p className="font-medium text-black">{cand.manifestoPillars[0]}</p>
-          </div>
-        )}
+        {/* Multi-stage Scrim Overlay */}
+        <div className="absolute inset-0 z-20 bg-gradient-to-t from-black/95 via-black/50 to-black/40 pointer-events-none" />
       </div>
 
-      <div className="mt-6 pt-4 border-t border-black/15">
-        <p className="font-bold text-lg text-[#111]">{cand.name}</p>
-        <p className="text-xs uppercase tracking-[0.12em] text-black/60 font-mono mt-0.5">
+      {/* Top Row: Office Tag and Year */}
+      <div className="relative z-10 flex items-start justify-between gap-2">
+        <span className="rounded-full bg-primary/95 backdrop-blur-md px-3.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-primary-foreground border border-white/25 shadow-xs">
+          {office.title}
+        </span>
+        <span className="rounded-full bg-black/60 backdrop-blur-md px-2.5 py-1 font-mono text-[10px] text-white/90 border border-white/15">
           {cand.yearOfStudy.replace('Bachelor of Pharmacy', 'B.Pharm')}
+        </span>
+      </div>
+
+      {/* Bottom Identity & CTA Block (Zero manifesto text on placard) */}
+      <div className="relative z-10 mt-auto pt-6 border-t border-white/20">
+        <h3 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight drop-shadow-md">
+          {cand.name}
+        </h3>
+        <p className="mt-0.5 text-xs text-white/80 font-mono">
+          Candidate ID: {cand.id.toUpperCase()}
         </p>
 
         <div className="mt-4 flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#111] px-4 py-2 text-xs font-semibold text-[#dfff5f] shadow-xs">
-            <span>View platform dossier</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white text-black px-4 py-2 text-xs font-semibold shadow-md">
+            <span>View candidate dossier</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </span>
         </div>

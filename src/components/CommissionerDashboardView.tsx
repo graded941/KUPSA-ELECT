@@ -1687,55 +1687,57 @@ export function CommissionerDashboardView({ onNavigate }: CommissionerDashboardV
                   <div
                     key={cand.id}
                     onClick={() => handleSelectCandidate(cand.id)}
-                    className={`rounded-2xl border bg-card p-4 space-y-3 cursor-pointer transition-all hover:border-ink ${
-                      selectedCandidateId === cand.id ? 'border-primary ring-2 ring-primary/20 shadow-xs' : 'border-border'
+                    className={`relative overflow-hidden rounded-2xl border min-h-[160px] p-4 flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.01] ${
+                      selectedCandidateId === cand.id
+                        ? 'border-primary ring-4 ring-primary/30 shadow-pop'
+                        : 'border-border shadow-xs hover:border-ink'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="relative h-11 w-11 rounded-full overflow-hidden bg-[#286746] text-white border border-border shrink-0 flex items-center justify-center font-bold text-xs">
-                          <span className="absolute inset-0 z-0 flex items-center justify-center">
-                            {cand.name.split(' ').map((w) => w[0]).join('').substring(0, 2).toUpperCase()}
-                          </span>
-                          {cand.photoUrl ? (
-                            <img
-                              src={cand.photoUrl}
-                              alt={cand.name}
-                              className="absolute inset-0 z-10 h-full w-full object-cover"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLElement).style.display = 'none';
-                              }}
-                            />
-                          ) : null}
-                        </div>
-                        <div>
-                          <h4 className="font-display font-bold text-foreground text-sm">{cand.name}</h4>
-                          <span className="text-xs text-muted-foreground font-mono">{cand.officeTitle}</span>
-                        </div>
+                    {/* Full Background Candidate Photo Plack Card */}
+                    <div className="absolute inset-0 z-0 bg-[#286746]">
+                      <div className="absolute inset-0 flex items-center justify-center font-display text-5xl font-bold text-white/20 select-none">
+                        {cand.name.split(' ').map((w) => w[0]).join('').substring(0, 2).toUpperCase()}
                       </div>
+                      {cand.photoUrl ? (
+                        <img
+                          src={cand.photoUrl}
+                          alt={cand.name}
+                          className="absolute inset-0 z-10 h-full w-full object-cover object-top"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : null}
+                      <div className="absolute inset-0 z-20 bg-gradient-to-t from-black/95 via-black/55 to-black/35 pointer-events-none" />
+                    </div>
 
+                    {/* Top Row: Office Title & Clearance Badge */}
+                    <div className="relative z-10 flex items-start justify-between gap-2">
+                      <span className="font-mono text-[10px] text-white font-medium bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/20 shadow-xs">
+                        {cand.officeTitle}
+                      </span>
                       <span
-                        className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                        className={`font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full backdrop-blur-md shrink-0 border border-white/10 ${
                           clearance.status === 'Cleared & Certified'
-                            ? 'bg-emerald-500/10 text-emerald-800'
+                            ? 'bg-emerald-500/80 text-white'
                             : clearance.status === 'Under Review'
-                            ? 'bg-amber-500/10 text-amber-800'
-                            : 'bg-blue-500/10 text-blue-800'
+                            ? 'bg-amber-500/80 text-white'
+                            : 'bg-blue-500/80 text-white'
                         }`}
                       >
                         {clearance.status}
                       </span>
                     </div>
 
-                    {cand.manifestoSummary && (
-                      <p className="text-xs text-foreground/80 line-clamp-2 italic">
-                        "{cand.manifestoSummary}"
-                      </p>
-                    )}
-
-                    <div className="pt-2 border-t border-border flex items-center justify-between text-[10px] font-mono text-muted-foreground">
-                      <span>Remarks: {clearance.notes}</span>
-                      <span>{clearance.updatedAt}</span>
+                    {/* Bottom Row: Candidate Name & Remarks (Zero Manifesto on Card) */}
+                    <div className="relative z-10 mt-auto pt-6">
+                      <h4 className="font-display font-bold text-white text-base drop-shadow-sm leading-tight">
+                        {cand.name}
+                      </h4>
+                      <div className="pt-2 border-t border-white/20 flex items-center justify-between text-[10px] font-mono text-white/80 mt-1.5">
+                        <span className="truncate max-w-[200px]">Remarks: {clearance.notes}</span>
+                        <span>{clearance.updatedAt}</span>
+                      </div>
                     </div>
                   </div>
                 );
